@@ -1,25 +1,68 @@
 {
   "expo": {
-    "name": "app",
-    "slug": "app",
+    "name": "R3U Worker's Attendance",
+    "slug": "r3u-waa",
+    "scheme": "r3uwaa",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#1C1B18",
+      "resizeMode": "contain",
+      "image": "./assets/splash-icon.png"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.r3u.waa",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "R3U Attendance uses Face ID to confirm it is really you clocking in or out."
+      }
     },
     "android": {
+      "package": "com.r3u.waa",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#1C1B18",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "R3U Attendance needs access to your photos so you can upload a valid ID.",
+          "cameraPermission": "R3U Attendance needs your camera to take the selfie that verifies each time punch."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "R3U Attendance records the GPS location of each time punch so your supervisor can verify you were on site."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "R3U Attendance uses Face ID to confirm it is really you clocking in or out."
+        }
+      ]
+    ]
   }
 }
