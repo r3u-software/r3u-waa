@@ -1,50 +1,48 @@
 /*
- * Not yet in the web nav — HR-DASHBOARD-RELOCATION-PROPOSAL.md, Stage A.
- *
  * The org-wide worker roster — was `(hr)/(tabs)/roster.tsx`, the Roster tab,
  * before HR-ADMIN-MOBILE-ACCESS-ADDENDUM.md narrowed HR/Admin's mobile
  * surface to three single-decision actions. This screen belongs to the full
  * HR/Admin surface, which lives on the web dashboard.
  *
- * Its data layer is fixed as of this phase: `fetchAllWorkers` /
- * `fetchSupervisors` now go through `waa-hr-roster` (company-scoped edge
- * function) instead of the direct table reads HR/Admin had no RLS grant
- * for — `waa_projects` was already fine via its own existing policy. The
- * screen itself is unchanged and will render real data the moment it's
- * linked from somewhere (Stage C of the same proposal).
+ * Its data layer went through `waa-hr-roster` (company-scoped edge function)
+ * in HR-DASHBOARD-RELOCATION-PROPOSAL.md's Stage A; the chrome below is
+ * `WebShell` (R3U-WAA-WEB-REDESIGN.md), replacing `TopBar` + `ScreenBody` +
+ * `HrDashboardNav`. Every list row still renders inside the plain `ui.tsx`
+ * `Card`/`Pill` — a white card on the glass canvas reads fine as-is — so
+ * only the chrome and the bits that used to sit directly on the paper
+ * background (heading, filter chips, the unresolved-supervisor note) needed
+ * a theme-aware color instead of `colors.*`.
  */
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useHrAdmin } from '../../src/lib/session';
 import { useAsync } from '../../src/lib/useAsync';
 import { fetchAllWorkers, fetchProjects, fetchSupervisors } from '../../src/lib/queries';
-import { ScreenBody, TopBar } from '../../src/components/Screen';
-import { HrDashboardNav } from '../../src/components/HrDashboardNav';
 import {
   Card,
   EmptyState,
   Loader,
   Pill,
   PrimaryButton,
-  Section,
   StatusStrip,
 } from '../../src/components/ui';
-import { colors, fonts, radius, toneForStatus, type } from '../../src/theme';
+import { colors, fonts, radius, toneForStatus } from '../../src/theme';
 import { initialsOf } from '../../src/lib/format';
+import { WebShell } from '../../src/web/WebShell';
+import { useWebTheme } from '../../src/web/webTheme';
+import { Chip, WebPageHeader, WebSection } from '../../src/web/webUi';
 
 /**
- * HR/Admin roster — every worker on every site, grouped by the supervisor they
- * report to, plus the register-supervisor action.
- *
  * There is no "which workers report to which supervisor" table; the grouping
- * is just `waa_workers.supervisor_id`, which is what the analysis expected.
- * Supervisor *names* need a SELECT on `waa_supervisors`, which HR/Admin has no
- * policy for in the deployed schema — the group falls back to a short id label
- * when the name can't be resolved.
+ * is just `waa_workers.supervisor_id`. Supervisor *names* need a SELECT on
+ * `waa_supervisors`, which HR/Admin has no policy for in the deployed
+ * schema — the group falls back to a short id label when the name can't be
+ * resolved.
  */
 export default function HrRoster() {
   const hrAdmin = useHrAdmin();
+  const { palette } = useWebTheme();
   const [showSeparated, setShowSeparated] = useState(false);
 
   const { data, loading, reload } = useAsync(async () => {
@@ -88,111 +86,85 @@ export default function HrRoster() {
   ).size;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.paper }}>
-      <TopBar label="Roster" />
-      <HrDashboardNav current="roster" />
-      <ScreenBody refreshing={loading} onRefresh={reload}>
-        <Text style={type.greet}>Everyone</Text>
-        <Text style={[type.subgreet, { marginBottom: 18 }]}>
-          Across {data?.projects.length ?? 0} site{(data?.projects.length ?? 0) === 1 ? '' : 's'}
+    <WebShell active="roster" title="Roster" subtitle={`Across ${data?.projects.length ?? 0} site${(data?.projects.length ?? 0) === 1 ? '' : 's'}`}>
+      <WebPageHeader eyebrow="Workforce" title="Everyone" sub="Every worker, grouped by the supervisor they report to." />
+
+      <StatusStrip
+        chips={[
+          { value: active, label: 'Active workers', tone: 'ok' },
+          { value: supervisorCount, label: 'Supervisors', tone: 'pending' },
+          { value: separated, label: 'Separated', tone: 'warn' },
+        ]}
+      />
+
+      <PrimaryButton
+        label="Register a supervisor"
+        onPress={() => router.push('/(hr)/register-supervisor')}
+        style={{ marginBottom: 18 }}
+      />
+
+      <View style={s.filterRow}>
+        {[
+          { key: false, label: 'Active only' },
+          { key: true, label: 'Include separated' },
+        ].map((f) => (
+          <Chip key={String(f.key)} label={f.label} active={showSeparated === f.key} onPress={() => setShowSeparated(f.key)} />
+        ))}
+      </View>
+
+      {loading && !data ? (
+        <Loader label="Loading roster" />
+      ) : groups.length === 0 ? (
+        <EmptyState
+          title="No workers yet"
+          body="Register a supervisor first — supervisors register their own workers."
+        />
+      ) : (
+        groups.map((g) => (
+          <WebSection key={g.key} title={g.label}>
+            <Card>
+              {g.workers.map((w, i) => (
+                <Pressable
+                  key={w.id}
+                  onPress={() => router.push(`/(hr)/worker/${w.id}`)}
+                  style={({ pressed }) => [
+                    s.row,
+                    i === g.workers.length - 1 && s.rowLast,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <View style={s.avatar}>
+                    <Text style={s.initials}>{initialsOf(w.full_name)}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.name}>{w.full_name}</Text>
+                    <Text style={s.sub}>
+                      {w.position || 'No position'} · {w.phone || 'no phone'}
+                    </Text>
+                  </View>
+                  <Pill
+                    label={w.employment_status}
+                    tone={toneForStatus(w.employment_status)}
+                  />
+                </Pressable>
+              ))}
+            </Card>
+          </WebSection>
+        ))
+      )}
+
+      {(data?.supervisors.length ?? 0) === 0 ? (
+        <Text style={{ fontSize: 11, color: palette.muted, lineHeight: 16, marginBottom: 30 }}>
+          Supervisor names can't be resolved from this account — `waa_supervisors` has no HR/Admin
+          SELECT policy in the deployed schema, so groups are labelled by id.
         </Text>
-
-        <StatusStrip
-          chips={[
-            { value: active, label: 'Active workers', tone: 'ok' },
-            { value: supervisorCount, label: 'Supervisors', tone: 'pending' },
-            { value: separated, label: 'Separated', tone: 'warn' },
-          ]}
-        />
-
-        <PrimaryButton
-          label="Register a supervisor"
-          onPress={() => router.push('/(hr)/register-supervisor')}
-          style={{ marginBottom: 18 }}
-        />
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterRow}>
-          {[
-            { key: false, label: 'Active only' },
-            { key: true, label: 'Include separated' },
-          ].map((f) => (
-            <Pressable
-              key={String(f.key)}
-              onPress={() => setShowSeparated(f.key)}
-              style={[s.filterChip, showSeparated === f.key && s.filterChipActive]}
-            >
-              <Text style={[s.filterText, showSeparated === f.key && s.filterTextActive]}>
-                {f.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        {loading && !data ? (
-          <Loader label="Loading roster" />
-        ) : groups.length === 0 ? (
-          <EmptyState
-            title="No workers yet"
-            body="Register a supervisor first — supervisors register their own workers."
-          />
-        ) : (
-          groups.map((g) => (
-            <Section key={g.key} title={g.label}>
-              <Card>
-                {g.workers.map((w, i) => (
-                  <Pressable
-                    key={w.id}
-                    onPress={() => router.push(`/(hr)/worker/${w.id}`)}
-                    style={({ pressed }) => [
-                      s.row,
-                      i === g.workers.length - 1 && s.rowLast,
-                      pressed && { opacity: 0.7 },
-                    ]}
-                  >
-                    <View style={s.avatar}>
-                      <Text style={s.initials}>{initialsOf(w.full_name)}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.name}>{w.full_name}</Text>
-                      <Text style={s.sub}>
-                        {w.position || 'No position'} · {w.phone || 'no phone'}
-                      </Text>
-                    </View>
-                    <Pill
-                      label={w.employment_status}
-                      tone={toneForStatus(w.employment_status)}
-                    />
-                  </Pressable>
-                ))}
-              </Card>
-            </Section>
-          ))
-        )}
-
-        {(data?.supervisors.length ?? 0) === 0 ? (
-          <Text style={s.note}>
-            Supervisor names can't be resolved from this account — `waa_supervisors` has no
-            HR/Admin SELECT policy in the deployed schema, so groups are labelled by id.
-          </Text>
-        ) : null}
-      </ScreenBody>
-    </View>
+      ) : null}
+    </WebShell>
   );
 }
 
 const s = StyleSheet.create({
-  filterRow: { gap: 8, paddingBottom: 18, paddingRight: 8 },
-  filterChip: {
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.line,
-  },
-  filterChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  filterText: { fontSize: 12, fontFamily: fonts.bodySemi, color: colors.muted },
-  filterTextActive: { color: colors.paper },
+  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 18, flexWrap: 'wrap' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -215,11 +187,4 @@ const s = StyleSheet.create({
   initials: { fontSize: 12, fontFamily: fonts.bodyBold, color: colors.steel },
   name: { fontSize: 13, fontFamily: fonts.bodyBold, color: colors.ink },
   sub: { fontSize: 11, color: colors.muted, fontFamily: fonts.body },
-  note: {
-    fontSize: 11,
-    color: colors.muted,
-    lineHeight: 16,
-    marginBottom: 30,
-    fontFamily: fonts.body,
-  },
 });

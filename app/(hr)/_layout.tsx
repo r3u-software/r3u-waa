@@ -1,45 +1,52 @@
 import React from 'react';
 import { Stack } from 'expo-router';
 import { colors, fonts } from '../../src/theme';
+import { WebThemeProvider } from '../../src/web/webTheme';
 
 /**
  * HR/Admin flow.
  *
- * The tab shell plus exactly one pushed screen: `sites`. The former pushed
- * screens (`settings`, `cash-advances`, `register-supervisor`, `worker/[id]`)
- * and the former tabs moved out here (`payroll-grid`, `roster`,
- * `separations-full`) are intentionally left undeclared and unlinked: expo
- * router still resolves them as routes, but nothing in the UI can reach them,
- * and they would be denied by RLS if it did. See the ORPHANED SCREEN banner at
- * the top of each.
+ * HR-DASHBOARD-RELOCATION-PROPOSAL.md's Stage C linked `payroll-grid`,
+ * `roster`, `cash-advances`, `separations-full` and `settings` into
+ * `HrDashboardNav`'s (now `WebShell`'s) nav — the "intentionally undeclared
+ * and unlinked" state this comment used to describe is stale as of that
+ * stage. All six of the full dashboard's top-level screens render their own
+ * complete chrome (`WebShell`, R3U-WAA-WEB-REDESIGN.md) and so are declared
+ * here with `headerShown: false`, the same as `analytics` already was —
+ * without that, expo-router's default Stack header (a bare filename as
+ * title, a back button to nowhere useful) would double up above it.
  *
- * `sites` is the deliberate exception, not a crack in that rule. It writes
- * `waa_projects` — a site's name and location, never a pay figure — through
- * real RLS policies scoped to the caller's own company, so it needs no edge
- * function and re-opens none of the payroll surface the addendum closed. It is
- * pushed from Profile rather than added as a sixth tab: it's setup work done
- * once per site, not a daily action worth a permanent tab slot.
+ * `worker/[id]` and `register-supervisor` stay genuinely pushed screens —
+ * reached from Roster with a real back target, not top-level nav
+ * destinations — so they keep the native Stack header and are left out of
+ * this list on purpose. `sites` is the same kind of pushed screen.
  *
- * `analytics` is the second exception (HR-ANALYTICS-ADDENDUM.md): the root
- * guard in app/_layout.tsx sends HR/Admin here on web instead of into
- * `(tabs)`. It goes through its own edge function (`waa-hr-analytics`), not
- * direct table access, same as everything else HR/Admin's full surface needs
- * post-retrofit.
+ * `WebThemeProvider` wraps the whole group once here rather than per-screen:
+ * every screen inside reads the same chosen theme/mode, and it never reaches
+ * Worker/Supervisor's native tabs, which sit in their own route groups
+ * outside this layout.
  */
 export default function HrLayout() {
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.card },
-        headerTitleStyle: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink },
-        headerTintColor: colors.ink,
-        headerShadowVisible: false,
-        contentStyle: { backgroundColor: colors.paper },
-      }}
-    >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="sites" options={{ title: 'Sites' }} />
-      <Stack.Screen name="analytics" options={{ title: 'Analytics', headerShown: false }} />
-    </Stack>
+    <WebThemeProvider>
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: colors.card },
+          headerTitleStyle: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink },
+          headerTintColor: colors.ink,
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: colors.paper },
+        }}
+      >
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="sites" options={{ title: 'Sites' }} />
+        <Stack.Screen name="analytics" options={{ headerShown: false }} />
+        <Stack.Screen name="payroll-grid" options={{ headerShown: false }} />
+        <Stack.Screen name="roster" options={{ headerShown: false }} />
+        <Stack.Screen name="cash-advances" options={{ headerShown: false }} />
+        <Stack.Screen name="separations-full" options={{ headerShown: false }} />
+        <Stack.Screen name="settings" options={{ headerShown: false }} />
+      </Stack>
+    </WebThemeProvider>
   );
 }

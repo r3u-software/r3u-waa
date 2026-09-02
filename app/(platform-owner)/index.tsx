@@ -1,15 +1,6 @@
 import React, { useState } from 'react';
-import {
-  Alert,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { usePlatformOwner, useSession } from '../../src/lib/session';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { usePlatformOwner } from '../../src/lib/session';
 import { useAsync } from '../../src/lib/useAsync';
 import {
   poCreateCompany,
@@ -18,7 +9,6 @@ import {
   poToggleCompanyActive,
 } from '../../src/lib/platformOwner';
 import type { PlatformOwnerCompany, PlatformOwnerHrAdmin } from '../../src/lib/types';
-import { ScreenBody } from '../../src/components/Screen';
 import {
   Card,
   EmptyState,
@@ -28,10 +18,11 @@ import {
   Pill,
   PrimaryButton,
   SecondaryButton,
-  Section,
 } from '../../src/components/ui';
-import { ChevronDownIcon, ChevronRightIcon, LockIcon, SiteIcon } from '../../src/components/icons';
+import { ChevronDownIcon, ChevronRightIcon, LockIcon } from '../../src/components/icons';
 import { colors, fonts, radius, spacing, type } from '../../src/theme';
+import { WebShell } from '../../src/web/WebShell';
+import { WebPageHeader, WebSection } from '../../src/web/webUi';
 
 /**
  * Platform Owner home — three actions, one page.
@@ -60,41 +51,15 @@ interface IssuedCredentials {
 }
 
 export default function PlatformOwnerHome() {
-  const insets = useSafeAreaInsets();
   const owner = usePlatformOwner();
-  const { signOut } = useSession();
 
   const { data: companies, loading, error, reload } = useAsync(() => poListCompanies(), []);
   const [credentials, setCredentials] = useState<IssuedCredentials | null>(null);
 
-  function confirmSignOut() {
-    Alert.alert('Sign out?', 'You will need your email and password to get back in.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: signOut },
-    ]);
-  }
-
   return (
-    <View style={{ flex: 1, backgroundColor: colors.paper }}>
-      <View style={[s.header, { paddingTop: insets.top + 16 }]}>
-        <View style={s.brandRow}>
-          <View style={s.brandMark}>
-            <SiteIcon size={18} color={colors.safety} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.co}>R3U SITE SUITE</Text>
-            <Text style={s.headerName}>Platform Owner</Text>
-          </View>
-          <Pressable onPress={confirmSignOut} hitSlop={8}>
-            <Text style={type.sectionLink}>Sign out</Text>
-          </Pressable>
-        </View>
-        <Text style={s.headerWho}>
-          Signed in as {owner.full_name} · {owner.email}
-        </Text>
-      </View>
+    <WebShell active="companies" title="Companies" subtitle={`Signed in as ${owner.full_name} · ${owner.email}`}>
+      <WebPageHeader eyebrow="Platform" title="Companies" sub="Onboard companies, reset HR/Admin passwords, suspend or reactivate access." />
 
-      <ScreenBody refreshing={loading} onRefresh={reload}>
         {error ? <ErrorNote message={error} /> : null}
 
         <CreateCompanySection
@@ -128,10 +93,9 @@ export default function PlatformOwnerHome() {
         />
 
         <SuspendSection companies={companies} loading={loading} onChanged={reload} />
-      </ScreenBody>
 
       <CredentialsModal issued={credentials} onDismiss={() => setCredentials(null)} />
-    </View>
+    </WebShell>
   );
 }
 
@@ -188,7 +152,7 @@ function CreateCompanySection({
   }
 
   return (
-    <Section title="Onboard a company">
+    <WebSection title="Onboard a company">
       <Card>
         <Pressable style={s.disclosure} onPress={() => setOpen((v) => !v)}>
           <View style={{ flex: 1 }}>
@@ -277,7 +241,7 @@ function CreateCompanySection({
           </View>
         ) : null}
       </Card>
-    </Section>
+    </WebSection>
   );
 }
 
@@ -324,7 +288,7 @@ function ResetPasswordSection({
   }
 
   return (
-    <Section title="Reset an HR/Admin password">
+    <WebSection title="Reset an HR/Admin password">
       {error ? <ErrorNote message={error} /> : null}
 
       {loading && !companies ? (
@@ -387,7 +351,7 @@ function ResetPasswordSection({
           );
         })
       )}
-    </Section>
+    </WebSection>
   );
 }
 
@@ -438,7 +402,7 @@ function SuspendSection({
   }
 
   return (
-    <Section title="Companies">
+    <WebSection title="Companies">
       {error ? <ErrorNote message={error} /> : null}
 
       {loading && !companies ? (
@@ -491,7 +455,7 @@ function SuspendSection({
           on its own — suspending does not cut anyone off mid-shift.
         </Text>
       </Card>
-    </Section>
+    </WebSection>
   );
 }
 
@@ -557,32 +521,6 @@ function CredentialsModal({
 /* ------------------------------------------------------------ Styles --- */
 
 const s = StyleSheet.create({
-  header: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-    backgroundColor: colors.card,
-  },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  brandMark: {
-    width: 34,
-    height: 34,
-    backgroundColor: colors.ink,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  co: { fontSize: 10, letterSpacing: 1.2, color: colors.muted, fontFamily: fonts.bodyBold },
-  headerName: {
-    fontFamily: fonts.serif,
-    fontSize: 19,
-    fontWeight: '700',
-    color: colors.ink,
-    lineHeight: 22,
-  },
-  headerWho: { fontSize: 11.5, color: colors.muted, marginTop: 8, fontFamily: fonts.body },
-
   disclosure: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   formBody: {
     marginTop: spacing.lg,

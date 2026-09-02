@@ -264,3 +264,78 @@ export function PlusCircleIcon(p: IconProps) {
     </Svg>
   );
 }
+
+/* --------------------------------------------- Web dashboard nav icons --- */
+/* Added for the src/web/ glass shell (R3U-WAA-WEB-REDESIGN.md). Same 24x24
+ * stroke convention as the icons above, kept in this file rather than
+ * src/web/ so every icon in the app still comes from one set. */
+
+export function ChartIcon(p: IconProps) {
+  return (
+    <Svg {...base(p)}>
+      <Path d="M4 20V10M12 20V4M20 20v-7" />
+    </Svg>
+  );
+}
+
+export function PayslipIcon(p: IconProps) {
+  return (
+    <Svg {...base(p)}>
+      <Rect x="3.5" y="5" width="17" height="14" rx="3" />
+      <Path d="M3.5 10h17M8 14.5h4" />
+    </Svg>
+  );
+}
+
+export function WalletIcon(p: IconProps) {
+  return (
+    <Svg {...base(p)}>
+      <Circle cx="12" cy="12" r="8.5" />
+      <Path d="M12 8.2v7.6M9.3 15.2c0 1 1 1.7 2.7 1.7 1.9 0 2.9-.8 2.9-1.9 0-2.7-5.6-1.3-5.6-4 0-1.1 1-1.9 2.7-1.9 1.5 0 2.5.6 2.7 1.6" />
+    </Svg>
+  );
+}
+
+export function DoorExitIcon(p: IconProps) {
+  return (
+    <Svg {...base(p)}>
+      <Path d="M6 12l4 4L20 6" />
+      <Path d="M3 19h3" />
+    </Svg>
+  );
+}
+
+export function GearIcon(p: IconProps) {
+  return (
+    <Svg {...base(p)}>
+      <Circle cx="12" cy="12" r="3" />
+      <Path d="M12 3.5v2.4M12 18v2.4M4.9 6.4l1.7 1.7M17.4 17.4l1.7 1.7M3.5 12h2.4M18 12h2.4M4.9 17.6l1.7-1.7M17.4 6.6l1.7-1.7" />
+    </Svg>
+  );
+}
+
+export function SunIcon(p: IconProps) {
+  return (
+    <Svg {...base(p)}>
+      <Circle cx="12" cy="12" r="4.2" />
+      <Path d="M12 2.5v2.4M12 19v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7" />
+    </Svg>
+  );
+}
+
+export function MoonIcon(p: IconProps) {
+  return (
+    <Svg {...base(p)}>
+      <Path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5z" />
+    </Svg>
+  );
+}
+
+export function SearchIcon(p: IconProps) {
+  return (
+    <Svg {...base(p)}>
+      <Circle cx="11" cy="11" r="7" />
+      <Path d="M20.5 20.5L16 16" />
+    </Svg>
+  );
+}

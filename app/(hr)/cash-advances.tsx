@@ -1,6 +1,4 @@
 /*
- * Not yet in the web nav — HR-DASHBOARD-RELOCATION-PROPOSAL.md, Stage A.
- *
  * The full cash-advance ledger (pending + approved + history). Replaced on
  * mobile by `(tabs)/index.tsx`, which does the same approve/decline and
  * proof-of-payout work through `waa-hr-mobile-cash-advances`, one decision at
@@ -28,8 +26,6 @@ import {
 import type { WaaCashAdvanceDetailed } from '../../src/lib/types';
 import { captureDocument, pickImageFromLibrary } from '../../src/lib/capture';
 import { uploadToPath } from '../../src/lib/storage';
-import { ScreenBody } from '../../src/components/Screen';
-import { HrDashboardNav } from '../../src/components/HrDashboardNav';
 import {
   ApproveRow,
   Card,
@@ -40,11 +36,12 @@ import {
   Pill,
   PrimaryButton,
   SecondaryButton,
-  Section,
 } from '../../src/components/ui';
 import { SignedImage } from '../../src/components/SignedImage';
 import { colors, fonts, spacing, toneForStatus, type } from '../../src/theme';
 import { peso, relativeStamp } from '../../src/lib/format';
+import { WebShell } from '../../src/web/WebShell';
+import { WebPageHeader, WebSection } from '../../src/web/webUi';
 
 /**
  * Cash advances, end to end: requested -> approved -> paid out -> settled.
@@ -112,12 +109,11 @@ export default function HrCashAdvances() {
   }
 
   return (
-    <>
-      <HrDashboardNav current="cash-advances" />
-      <ScreenBody refreshing={loading} onRefresh={reload}>
+    <WebShell active="cash-advances" title="Cash advances" subtitle="Requested → approved → paid out → settled">
+      <WebPageHeader eyebrow="Workforce" title="Cash advances" sub="Every request, on every site, from filing to settlement." />
       {error ? <ErrorNote message={error} /> : null}
 
-      <Section title="Waiting on you">
+      <WebSection title="Waiting on you">
         {loading && !data ? (
           <Loader />
         ) : pending.length === 0 ? (
@@ -151,9 +147,9 @@ export default function HrCashAdvances() {
             </Card>
           ))
         )}
-      </Section>
+      </WebSection>
 
-      <Section title="Approved — release the money">
+      <WebSection title="Approved — release the money">
         {approved.length === 0 ? (
           <EmptyState
             title="Nothing to release"
@@ -186,9 +182,9 @@ export default function HrCashAdvances() {
             </Card>
           ))
         )}
-      </Section>
+      </WebSection>
 
-      <Section title="History">
+      <WebSection title="History">
         {history.length === 0 ? (
           <EmptyState title="Nothing yet" />
         ) : (
@@ -223,7 +219,7 @@ export default function HrCashAdvances() {
             </Card>
           ))
         )}
-      </Section>
+      </WebSection>
 
       {/* ------------------------- Decline remarks ---------------------- */}
       <Modal
@@ -270,8 +266,7 @@ export default function HrCashAdvances() {
           </Pressable>
         </Pressable>
       </Modal>
-      </ScreenBody>
-    </>
+    </WebShell>
   );
 }
 

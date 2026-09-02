@@ -44,8 +44,6 @@ import {
 import type { PayrollRunStatus, WaaPayslipDetailed } from '../../src/lib/types';
 import { captureDocument, pickImageFromLibrary } from '../../src/lib/capture';
 import { uploadToPath } from '../../src/lib/storage';
-import { ScreenBody, TopBar } from '../../src/components/Screen';
-import { HrDashboardNav } from '../../src/components/HrDashboardNav';
 import {
   Card,
   EmptyState,
@@ -54,11 +52,12 @@ import {
   Pill,
   PrimaryButton,
   SecondaryButton,
-  Section,
   StatusStrip,
 } from '../../src/components/ui';
 import { colors, fonts, radius, spacing, toneForStatus, type } from '../../src/theme';
 import { cutoffFor, hours, periodLabel, peso, toDateColumn } from '../../src/lib/format';
+import { WebShell } from '../../src/web/WebShell';
+import { Chip, WebPageHeader, WebSection } from '../../src/web/webUi';
 
 /** The lifecycle, in order. `paid` is handled separately — it needs proofs first. */
 const NEXT_STATUS: Record<PayrollRunStatus, PayrollRunStatus | null> = {
@@ -258,15 +257,16 @@ export default function HrPayroll() {
   const next = run ? NEXT_STATUS[run.status] : null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.paper }}>
-      <TopBar label="Payroll" />
-      <HrDashboardNav current="payroll-grid" />
-      <ScreenBody refreshing={loading} onRefresh={reload}>
-        <Text style={type.greet}>Payroll</Text>
-        <Text style={[type.subgreet, { marginBottom: 18 }]}>
-          Every site, every active worker · {data?.settings?.cutoff_type.replace('_', '-') ?? '—'}{' '}
-          cutoff
-        </Text>
+    <WebShell
+      active="payroll-grid"
+      title="Payroll"
+      subtitle={`Every site, every active worker · ${data?.settings?.cutoff_type.replace('_', '-') ?? '—'} cutoff`}
+    >
+        <WebPageHeader
+          eyebrow="Workforce"
+          title="Payroll"
+          sub={`Every site, every active worker · ${data?.settings?.cutoff_type.replace('_', '-') ?? '—'} cutoff.`}
+        />
 
         {error ? <ErrorNote message={error} /> : null}
 
@@ -298,30 +298,23 @@ export default function HrPayroll() {
         ) : (
           <>
             {/* --------------------------- Run picker ------------------- */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={s.filterRow}
-            >
+            <View style={s.filterRow}>
               {data!.runs.map((r) => {
                 const active = r.id === data!.activeRunId;
                 return (
-                  <Pressable
+                  <Chip
                     key={r.id}
+                    label={periodLabel(r.period_start, r.period_end)}
+                    active={active}
                     onPress={() => {
                       setSelectedRunId(r.id);
                       setExpanded(null);
                       setError(null);
                     }}
-                    style={[s.filterChip, active && s.filterChipActive]}
-                  >
-                    <Text style={[s.filterText, active && s.filterTextActive]}>
-                      {periodLabel(r.period_start, r.period_end)}
-                    </Text>
-                  </Pressable>
+                  />
                 );
               })}
-            </ScrollView>
+            </View>
 
             {run ? (
               <>
@@ -381,7 +374,7 @@ export default function HrPayroll() {
                   />
                 ) : (
                   groups.map((g) => (
-                    <Section key={g.site} title={g.site}>
+                    <WebSection key={g.site} title={g.site}>
                       <Card style={{ padding: 0, overflow: 'hidden' }}>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                           <View>
@@ -510,7 +503,7 @@ export default function HrPayroll() {
                             onAttachProof={() => attachProof(p)}
                           />
                         ))}
-                    </Section>
+                    </WebSection>
                   ))
                 )}
 
@@ -524,7 +517,6 @@ export default function HrPayroll() {
             ) : null}
           </>
         )}
-      </ScreenBody>
 
       {/* --------------------------- Run generator ---------------------- */}
       <Modal
@@ -598,7 +590,7 @@ export default function HrPayroll() {
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </WebShell>
   );
 }
 
@@ -707,18 +699,7 @@ function DateBox({ label, value, onPress }: { label: string; value: Date; onPres
 
 const s = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  filterRow: { gap: 8, paddingBottom: 18, paddingRight: 8 },
-  filterChip: {
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.line,
-  },
-  filterChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  filterText: { fontSize: 12, fontFamily: fonts.bodySemi, color: colors.muted },
-  filterTextActive: { color: colors.paper },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
 
   runCard: { marginBottom: 18 },
   runHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },

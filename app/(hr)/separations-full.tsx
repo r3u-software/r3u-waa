@@ -27,11 +27,11 @@ import {
   fetchSupervisors,
 } from '../../src/lib/queries';
 import type { WaaPayslip } from '../../src/lib/types';
-import { ScreenBody, TopBar } from '../../src/components/Screen';
-import { HrDashboardNav } from '../../src/components/HrDashboardNav';
-import { Card, EmptyState, Loader, Pill, Section, StatusStrip } from '../../src/components/ui';
+import { Card, EmptyState, Loader, Pill, StatusStrip } from '../../src/components/ui';
 import { colors, fonts, radius, toneForStatus, type } from '../../src/theme';
 import { initialsOf, periodLabel, peso, relativeStamp } from '../../src/lib/format';
+import { WebShell } from '../../src/web/WebShell';
+import { WebPageHeader, WebSection } from '../../src/web/webUi';
 
 /**
  * Separation inbox.
@@ -99,16 +99,10 @@ export default function HrSeparations() {
   const withPending = cases.filter((c) => c.slips.length > 0 || c.advances.length > 0).length;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.paper }}>
-      <TopBar label="Separations" />
-      <HrDashboardNav current="separations-full" />
-      <ScreenBody refreshing={loading} onRefresh={reload}>
-        <Text style={type.greet}>Separation cases</Text>
-        <Text style={[type.subgreet, { marginBottom: 18 }]}>
-          Tagged by a supervisor · pay outcome is your call
-        </Text>
+    <WebShell active="separations-full" title="Separations" subtitle="Tagged by a supervisor · pay outcome is your call">
+      <WebPageHeader eyebrow="System" title="Separation cases" sub="Tagged by a supervisor · pay outcome is your call." />
 
-        <StatusStrip
+      <StatusStrip
           chips={[
             { value: cases.length, label: 'Separated', tone: 'warn' },
             { value: withPending, label: 'With pending pay', tone: 'pending' },
@@ -124,7 +118,7 @@ export default function HrSeparations() {
             body="Workers tagged Terminated, AWOL or Resigned by their supervisor appear here with their pending pay context."
           />
         ) : (
-          <Section title="Cases">
+          <WebSection title="Cases">
             {cases.map((c) => (
               <Card key={c.worker.id}>
                 <Pressable
@@ -195,10 +189,9 @@ export default function HrSeparations() {
                 )}
               </Card>
             ))}
-          </Section>
+          </WebSection>
         )}
-      </ScreenBody>
-    </View>
+    </WebShell>
   );
 }
 
