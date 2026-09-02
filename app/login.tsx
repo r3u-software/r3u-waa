@@ -199,7 +199,7 @@ function GlassField({
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: P.bg, overflow: 'hidden' },
   flex: { flex: 1 },
-  content: { padding: 22, paddingBottom: 60, alignItems: 'stretch' },
+  content: { padding: 22, paddingBottom: 60, alignItems: 'stretch', width: '100%', maxWidth: 440, alignSelf: 'center' },
   glowA: {
     position: 'absolute',
     top: -140,
