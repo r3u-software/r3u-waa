@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useWorker } from '../../src/lib/session';
 import { getSignedUrl } from '../../src/lib/storage';
 import { EmptyState } from '../../src/components/ui';
+import { PdfViewer } from '../../src/components/PdfViewer';
 import { colors, fonts, spacing } from '../../src/theme';
 
 /**
@@ -12,8 +12,10 @@ import { colors, fonts, spacing } from '../../src/theme';
  * There is deliberately NO upload or replace control here — contracts are
  * supervisor-uploaded only, per the brief.
  *
- * Android's WebView has no built-in PDF renderer, so the signed URL is handed
- * to Google's viewer there; iOS renders PDFs natively.
+ * This screen only ever runs on Android (Worker stays field/Android-only per
+ * WEB-DEPLOYMENT-ADDENDUM.md), but the actual PDF rendering is delegated to
+ * `PdfViewer`, which also has a web fallback — kept in sync in case a future
+ * HR/Admin web screen needs to show the same contract.
  */
 export default function ContractScreen() {
   const worker = useWorker();
@@ -52,25 +54,7 @@ export default function ContractScreen() {
     );
   }
 
-  const source =
-    Platform.OS === 'android'
-      ? { uri: `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}` }
-      : { uri: url };
-
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.paper }}>
-      <WebView
-        source={source}
-        style={{ flex: 1 }}
-        startInLoadingState
-        renderLoading={() => (
-          <View style={s.center}>
-            <ActivityIndicator color={colors.steel} />
-          </View>
-        )}
-      />
-    </View>
-  );
+  return <PdfViewer url={url} />;
 }
 
 const s = StyleSheet.create({

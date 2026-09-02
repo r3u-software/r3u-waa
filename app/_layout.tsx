@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Slot, useRouter, useSegments } from 'expo-router';
@@ -112,7 +112,15 @@ function RootNavigator() {
     } else if (role === 'supervisor' && !inSupervisor) {
       router.replace('/(supervisor)');
     } else if (role === 'hr_admin' && !inHr) {
-      router.replace('/(hr)');
+      // HR-ANALYTICS-ADDENDUM.md / WEB-DEPLOYMENT-ADDENDUM.md: the mobile tab
+      // shell ((tabs)/index.tsx) stays HR/Admin's landing screen on Android --
+      // that part of HR-ADMIN-MOBILE-ACCESS-ADDENDUM.md isn't superseded by
+      // this change. On web, land on the one real full-dashboard screen that
+      // exists so far (analytics) instead. This is the only platform branch
+      // in this file; the rest of HR/Admin's web dashboard (grid, roster,
+      // settings) and any native-side lockout are a separate, not-yet-built
+      // phase -- deliberately not touched here.
+      router.replace(Platform.OS === 'web' ? '/(hr)/analytics' : '/(hr)');
     } else if (role === 'platform_owner' && !inPlatformOwner) {
       router.replace('/(platform-owner)');
     }

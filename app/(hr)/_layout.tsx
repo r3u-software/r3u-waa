@@ -19,6 +19,12 @@ import { colors, fonts } from '../../src/theme';
  * function and re-opens none of the payroll surface the addendum closed. It is
  * pushed from Profile rather than added as a sixth tab: it's setup work done
  * once per site, not a daily action worth a permanent tab slot.
+ *
+ * `analytics` is the second exception (HR-ANALYTICS-ADDENDUM.md): the root
+ * guard in app/_layout.tsx sends HR/Admin here on web instead of into
+ * `(tabs)`. It goes through its own edge function (`waa-hr-analytics`), not
+ * direct table access, same as everything else HR/Admin's full surface needs
+ * post-retrofit.
  */
 export default function HrLayout() {
   return (
@@ -33,6 +39,7 @@ export default function HrLayout() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="sites" options={{ title: 'Sites' }} />
+      <Stack.Screen name="analytics" options={{ title: 'Analytics', headerShown: false }} />
     </Stack>
   );
 }
