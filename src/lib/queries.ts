@@ -448,9 +448,16 @@ export async function fetchTeamRows(periodStart: string, periodEnd: string): Pro
  * The authoritative flag, straight from the same SECURITY DEFINER function the
  * `draft -> reviewed` trigger calls. Used to confirm the client-side overlap
  * computation above agrees with what will actually gate the payroll run.
+ *
+ * Calls the `_for_caller` wrapper, not `waa_worker_has_leave_overlap` itself —
+ * the bare function has no caller/company check at all (it's meant for the
+ * trigger's own internal use, where that check doesn't apply) and client
+ * EXECUTE on it was revoked for exactly that reason. The wrapper resolves to
+ * `false` for a worker outside the caller's own company rather than leaking
+ * whether that worker exists.
  */
 export async function fetchWorkerLeaveOverlapFlag(workerId: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('waa_worker_has_leave_overlap', {
+  const { data, error } = await supabase.rpc('waa_worker_has_leave_overlap_for_caller', {
     p_worker_id: workerId,
   });
   if (error) throw new Error(error.message);
