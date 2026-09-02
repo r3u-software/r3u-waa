@@ -180,16 +180,24 @@ export interface WaaCashAdvanceDetailed extends WaaCashAdvanceWithMoney {
 
 /* ------------------------------------------------- Payroll configuration --- */
 
-/** Singleton org-wide settings row. Every authenticated role may read it. */
+/**
+ * One row per company (post-multi-tenant-retrofit — the "Singleton" in the
+ * old comment here predates `company_id` and no longer applies; there is no
+ * `is_singleton` column in the deployed schema, confirmed against
+ * information_schema after a real, live bug from that stale assumption).
+ * Every authenticated role in the company may read their own company's row.
+ */
 export interface WaaPayrollSettings {
   id: string;
-  is_singleton: boolean;
   cutoff_type: CutoffType;
   overtime_rate_ordinary: number;
   overtime_rate_restday_holiday: number;
   standard_hours_per_day: number;
   set_by: string | null;
   updated_at: string;
+  company_id: string;
+  /** Bitmask of workdays for the HR-analytics attendance denominator: bit0=Mon..bit6=Sun. */
+  workdays_mask: number;
 }
 
 /** One mutable rate per worker — no effective-dating in v1. */
@@ -200,10 +208,13 @@ export interface WaaWorkerPay {
   updated_at: string;
 }
 
+/** Per-company (confirmed against information_schema — was missing company_id/default_amount here). */
 export interface WaaDeductionType {
   id: string;
   name: string;
   active_by_default: boolean;
+  company_id: string;
+  default_amount: number;
 }
 
 /** Per-worker override of a deduction type's org-wide default. */

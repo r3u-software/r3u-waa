@@ -200,12 +200,19 @@ export async function updateWorkerProfile(
  * compute a client-side estimate against the real overtime rate and standard
  * day length rather than guessing.
  */
+/**
+ * Pre-existing bug fixed here, found live: this filtered on `is_singleton`,
+ * a column that does not exist in the deployed schema at all (confirmed
+ * against information_schema — not a typo introduced this phase, just never
+ * caught because every caller of this function was itself unreachable until
+ * now). Every request to `waa_payroll_settings` 400'd with `42703 column
+ * waa_payroll_settings.is_singleton does not exist`, silently, since no
+ * caller checked the response status closely enough to notice before this.
+ * RLS's own `waa_payroll_settings_select_own_company` policy already scopes
+ * this to exactly the caller's own company's one row — no filter needed.
+ */
 export async function fetchPayrollSettings(): Promise<WaaPayrollSettings | null> {
-  const res = await supabase
-    .from('waa_payroll_settings')
-    .select('*')
-    .eq('is_singleton', true)
-    .maybeSingle();
+  const res = await supabase.from('waa_payroll_settings').select('*').maybeSingle();
   if (res.error) throw new Error(res.error.message);
   return res.data as WaaPayrollSettings | null;
 }
@@ -282,10 +289,27 @@ export async function fetchRoster(): Promise<WaaWorker[]> {
   return unwrap<WaaWorker[]>(res as never);
 }
 
+/**
+ * Supervisor's own worker-detail screen calls this too, and Supervisor has
+ * a real RLS policy for their own workers (`waa_workers_select_by_supervisor`)
+ * -- left as a direct table read for that caller. HR/Admin has no such
+ * policy at all, so `app/(hr)/worker/[id].tsx` uses `fetchWorkerByIdForHr`
+ * below instead, not this function.
+ */
 export async function fetchWorkerById(workerId: string): Promise<WaaWorker | null> {
   const res = await supabase.from('waa_workers').select('*').eq('id', workerId).maybeSingle();
   if (res.error) throw new Error(res.error.message);
   return res.data as WaaWorker | null;
+}
+
+/** HR/Admin-only counterpart to `fetchWorkerById` above -- see that comment. */
+export async function fetchWorkerByIdForHr(workerId: string): Promise<WaaWorker | null> {
+  const res = await callHrFn<{ item: WaaWorker | null }>(
+    'waa-hr-worker-detail',
+    { action: 'get_worker', worker_id: workerId },
+    'Could not load that worker.'
+  );
+  return res.item;
 }
 
 export async function fetchPendingTimeEntries(): Promise<WaaTimeEntryDetailed[]> {
@@ -599,6 +623,25 @@ async function edgeErrorMessage(error: unknown, fallback: string): Promise<strin
   return message || fallback;
 }
 
+/**
+ * Shared invoker for the HR full-dashboard edge functions
+ * (`waa-hr-roster`, `waa-hr-payroll-grid`, `waa-hr-settings`,
+ * `waa-hr-worker-detail`, and `waa-hr-mobile-cash-advances`'s `list_all`) —
+ * HR-DASHBOARD-RELOCATION-PROPOSAL.md. Every exported function below that
+ * calls one of these keeps its original signature and return shape exactly,
+ * so the 6 screens that call them did not need to change at all — only the
+ * transport underneath did.
+ */
+async function callHrFn<T>(
+  fnName: string,
+  body: Record<string, unknown>,
+  fallback: string
+): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(fnName, { body });
+  if (error) throw new Error(await edgeErrorMessage(error, fallback));
+  return data as T;
+}
+
 /* ============================================================= HR/ADMIN === */
 
 /**
@@ -609,40 +652,47 @@ async function edgeErrorMessage(error: unknown, fallback: string): Promise<strin
 
 /** Every worker, separated ones included — HR/Admin sees the whole picture. */
 export async function fetchAllWorkers(): Promise<WaaWorker[]> {
-  const res = await supabase.from('waa_workers').select('*').order('full_name');
-  return unwrap<WaaWorker[]>(res as never);
+  const res = await callHrFn<{ items: WaaWorker[] }>(
+    'waa-hr-roster',
+    { action: 'list_workers' },
+    'Could not load the worker list.'
+  );
+  return res.items;
 }
 
 /**
  * Supervisors, for the HR/Admin roster.
  *
- * NOTE: `waa_supervisors` currently has only a `select_own` policy — there is
- * no HR/Admin SELECT grant on it — so this comes back empty for HR/Admin
- * today. The screen handles that by falling back to grouping workers by
- * `supervisor_id`; adding the missing policy is a backend change.
+ * `waa_supervisors` has only a `select_own` policy (Supervisor's own row) --
+ * no HR/Admin SELECT grant exists, verified against pg_policies before
+ * `waa-hr-roster` was built. Routed through that function now instead of
+ * the direct-table call that used to come back empty for HR/Admin.
  */
 export async function fetchSupervisors(): Promise<WaaSupervisor[]> {
-  const res = await supabase.from('waa_supervisors').select('*').order('full_name');
-  if (res.error) return [];
-  return (res.data as WaaSupervisor[]) ?? [];
+  const res = await callHrFn<{ items: WaaSupervisor[] }>(
+    'waa-hr-roster',
+    { action: 'list_supervisors' },
+    'Could not load the supervisor list.'
+  );
+  return res.items;
 }
 
 export async function fetchPayrollRuns(): Promise<WaaPayrollRun[]> {
-  const res = await supabase
-    .from('waa_payroll_runs')
-    .select('*')
-    .order('period_start', { ascending: false });
-  return unwrap<WaaPayrollRun[]>(res as never);
+  const res = await callHrFn<{ items: WaaPayrollRun[] }>(
+    'waa-hr-payroll-grid',
+    { action: 'list_runs' },
+    'Could not load payroll runs.'
+  );
+  return res.items;
 }
 
 export async function fetchPayslipsForRun(runId: string): Promise<WaaPayslipDetailed[]> {
-  const res = await supabase
-    .from('waa_payslips')
-    .select(
-      '*, worker:waa_workers(id, full_name, position, current_project_id, supervisor_id)'
-    )
-    .eq('payroll_run_id', runId);
-  return unwrap<WaaPayslipDetailed[]>(res as never);
+  const res = await callHrFn<{ items: WaaPayslipDetailed[] }>(
+    'waa-hr-payroll-grid',
+    { action: 'list_payslips_for_run', run_id: runId },
+    'Could not load payslips for that run.'
+  );
+  return res.items;
 }
 
 /**
@@ -668,14 +718,14 @@ export async function generatePayrollRun(
  * rather than replacing it with something generic.
  */
 export async function setPayrollRunStatus(runId: string, status: PayrollRunStatus) {
-  const stamp = new Date().toISOString();
-  const patch: Record<string, unknown> = { status };
-  if (status === 'reviewed') patch.reviewed_at = stamp;
-  if (status === 'finalized') patch.finalized_at = stamp;
-  if (status === 'paid') patch.paid_at = stamp;
-
-  const res = await supabase.from('waa_payroll_runs').update(patch).eq('id', runId);
-  if (res.error) throw new Error(res.error.message);
+  // The screen only ever calls this with 'reviewed' or 'finalized' -- a
+  // 'paid' transition always goes through markPayrollRunPaid below instead,
+  // which the edge function's separate mark_paid action mirrors.
+  await callHrFn(
+    'waa-hr-payroll-grid',
+    { action: 'advance_status', run_id: runId, status },
+    'Could not change the run status.'
+  );
 }
 
 /**
@@ -689,38 +739,41 @@ export async function setPayrollRunStatus(runId: string, status: PayrollRunStatu
  * cannot filter on the run's own status.
  */
 export async function markPayrollRunPaid(runId: string) {
-  await setPayrollRunStatus(runId, 'paid');
-  const res = await supabase
-    .from('waa_payslips')
-    .update({ paid_at: new Date().toISOString() })
-    .eq('payroll_run_id', runId)
-    .is('paid_at', null);
-  if (res.error) throw new Error(res.error.message);
+  // The edge function's mark_paid action does both steps atomically
+  // server-side (status -> paid, then paid_at stamped on every payslip) --
+  // same order/behavior as before, just no longer two separate client calls.
+  await callHrFn(
+    'waa-hr-payroll-grid',
+    { action: 'mark_paid', run_id: runId },
+    'Could not mark the run as paid.'
+  );
 }
 
 /** Writes an uploaded proof path onto one worker's payslip. */
 export async function attachPayslipProof(payslipId: string, proofPath: string) {
-  const res = await supabase
-    .from('waa_payslips')
-    .update({ proof_url: proofPath })
-    .eq('id', payslipId);
-  if (res.error) throw new Error(res.error.message);
+  await callHrFn(
+    'waa-hr-payroll-grid',
+    { action: 'attach_proof', payslip_id: payslipId, proof_path: proofPath },
+    'Could not attach the proof.'
+  );
 }
 
 /* ------------------------------------------- HR/Admin: cash advances --- */
 
 export async function fetchAllCashAdvances(): Promise<WaaCashAdvanceDetailed[]> {
-  const res = await supabase
-    .from('waa_cash_advance_requests')
-    .select('*, money:waa_cash_advance_money(*), worker:waa_workers(id, full_name)')
-    .order('created_at', { ascending: false });
-  return unwrap<WaaCashAdvanceDetailed[]>(res as never);
+  const res = await callHrFn<{ items: WaaCashAdvanceDetailed[] }>(
+    'waa-hr-mobile-cash-advances',
+    { action: 'list_all' },
+    'Could not load cash advances.'
+  );
+  return res.items;
 }
 
 /**
- * Approve or decline an advance. The decision metadata lives on the money row
- * (`approved_by` / `approved_at` / `decline_remarks`); the request row only
- * carries the status.
+ * Approve or decline an advance. Reuses the same `decide` action the
+ * emergency-mobile cash-advance screen already calls (`waa-hr-mobile-cash-advances`)
+ * rather than a duplicate function -- per HR-DASHBOARD-RELOCATION-PROPOSAL.md,
+ * that logic is already company-scoped and already live-tested.
  */
 export async function hrDecideCashAdvance(
   requestId: string,
@@ -728,43 +781,44 @@ export async function hrDecideCashAdvance(
   hrAdminId: string,
   remarks?: string
 ) {
-  const moneyRes = await supabase
-    .from('waa_cash_advance_money')
-    .update({
-      approved_by: hrAdminId,
-      approved_at: new Date().toISOString(),
-      decline_remarks: decision === 'declined' ? remarks || null : null,
-    })
-    .eq('cash_advance_id', requestId);
-  if (moneyRes.error) throw new Error(moneyRes.error.message);
-
-  const res = await supabase
-    .from('waa_cash_advance_requests')
-    .update({ status: decision })
-    .eq('id', requestId);
-  if (res.error) throw new Error(res.error.message);
-}
-
-/** Records the proof of an actual disbursement, before the paid_out attempt. */
-export async function attachCashAdvanceProof(requestId: string, proofPath: string) {
-  const res = await supabase
-    .from('waa_cash_advance_money')
-    .update({ proof_url: proofPath, paid_out_at: new Date().toISOString() })
-    .eq('cash_advance_id', requestId);
-  if (res.error) throw new Error(res.error.message);
+  void hrAdminId; // the edge function derives the actor from the caller's own session
+  await callHrFn(
+    'waa-hr-mobile-cash-advances',
+    { action: 'decide', cash_advance_id: requestId, decision, remarks },
+    'Could not save that decision.'
+  );
 }
 
 /**
- * Flips an advance to `paid_out`. The `waa_car_require_proof` trigger rejects
- * this outright if `waa_cash_advance_money.proof_url` is still null, so the
- * proof upload must land first.
+ * Records the proof of an actual disbursement, then flips the request to
+ * `paid_out` -- both steps the mobile function's `mark_paid_out` action
+ * already does atomically, in the same order the DB trigger
+ * (`waa_car_require_proof`) requires. `markCashAdvancePaidOut` below is kept
+ * as a real export (the screen still calls both in sequence) but the actual
+ * work all happens here; its own call is a harmless no-op re-request of the
+ * same already-completed state.
  */
-export async function markCashAdvancePaidOut(requestId: string) {
-  const res = await supabase
-    .from('waa_cash_advance_requests')
-    .update({ status: 'paid_out' })
-    .eq('id', requestId);
-  if (res.error) throw new Error(res.error.message);
+export async function attachCashAdvanceProof(requestId: string, proofPath: string) {
+  await callHrFn(
+    'waa-hr-mobile-cash-advances',
+    { action: 'mark_paid_out', cash_advance_id: requestId, proof_url: proofPath },
+    'Could not attach the proof.'
+  );
+}
+
+/**
+ * The screen calls this immediately after `attachCashAdvanceProof` above,
+ * which already completed the full paid_out flip via the shared
+ * `mark_paid_out` action -- there is nothing left for this call to do.
+ * Deliberately a no-op rather than re-fetching `proof_url` to resend it:
+ * HR/Admin has no SELECT policy on `waa_cash_advance_money` (verified, same
+ * gap this whole build is fixing), so a direct read here would silently
+ * come back empty and this would fail right after the real work succeeded.
+ * Kept as a real export only so the screen's existing two-call sequence
+ * doesn't need to change.
+ */
+export async function markCashAdvancePaidOut(_requestId: string) {
+  void _requestId;
 }
 
 /* ------------------------------------------------ HR/Admin: settings --- */
@@ -782,16 +836,30 @@ export async function updatePayrollSettings(
   >,
   hrAdminId: string
 ) {
-  const res = await supabase
-    .from('waa_payroll_settings')
-    .update({ ...patch, set_by: hrAdminId, updated_at: new Date().toISOString() })
-    .eq('id', settingsId);
-  if (res.error) throw new Error(res.error.message);
+  void hrAdminId; // the edge function derives set_by from the caller's own session
+  await callHrFn(
+    'waa-hr-settings',
+    { action: 'update_settings', settings_id: settingsId, patch },
+    'Could not save the settings.'
+  );
 }
 
+/**
+ * `waa_deduction_types` has RLS enabled with zero policies at all (verified
+ * against pg_policies -- fully closed to every non-service-role caller, not
+ * just missing an HR/Admin grant), and it carries its own company_id column
+ * (also verified, not assumed from the -- incomplete -- WaaDeductionType TS
+ * type, which is missing both company_id and default_amount). Both settings.tsx
+ * and worker/[id].tsx call this same function; either function's
+ * get_deduction_types action returns the identical company-scoped shape.
+ */
 export async function fetchDeductionTypes(): Promise<WaaDeductionType[]> {
-  const res = await supabase.from('waa_deduction_types').select('*').order('name');
-  return unwrap<WaaDeductionType[]>(res as never);
+  const res = await callHrFn<{ items: WaaDeductionType[] }>(
+    'waa-hr-settings',
+    { action: 'get_deduction_types' },
+    'Could not load deduction types.'
+  );
+  return res.items;
 }
 
 /**
@@ -812,44 +880,38 @@ export async function setDeductionDefault(typeId: string, activeByDefault: boole
 /* --------------------------------------- HR/Admin: per-worker payroll --- */
 
 export async function fetchWorkerPay(workerId: string): Promise<WaaWorkerPay | null> {
-  const res = await supabase
-    .from('waa_worker_pay')
-    .select('*')
-    .eq('worker_id', workerId)
-    .maybeSingle();
-  if (res.error) throw new Error(res.error.message);
-  return res.data as WaaWorkerPay | null;
+  const res = await callHrFn<{ item: WaaWorkerPay | null }>(
+    'waa-hr-worker-detail',
+    { action: 'get_pay', worker_id: workerId },
+    'Could not load pay information.'
+  );
+  return res.item;
 }
 
 export async function upsertWorkerPay(workerId: string, hourlyRate: number, hrAdminId: string) {
-  const res = await supabase.from('waa_worker_pay').upsert(
-    {
-      worker_id: workerId,
-      hourly_rate: hourlyRate,
-      set_by: hrAdminId,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'worker_id' }
+  void hrAdminId; // derived from the caller's own session server-side
+  await callHrFn(
+    'waa-hr-worker-detail',
+    { action: 'save_rate', worker_id: workerId, hourly_rate: hourlyRate },
+    'Could not save the rate.'
   );
-  if (res.error) throw new Error(res.error.message);
 }
 
 export async function updateWorkerPosition(workerId: string, position: string) {
-  const res = await supabase
-    .from('waa_workers')
-    .update({ position: position || null })
-    .eq('id', workerId);
-  if (res.error) throw new Error(res.error.message);
+  await callHrFn(
+    'waa-hr-worker-detail',
+    { action: 'save_position', worker_id: workerId, position },
+    'Could not save the position.'
+  );
 }
 
 export async function fetchWorkerLeavePay(workerId: string): Promise<WaaWorkerLeavePay | null> {
-  const res = await supabase
-    .from('waa_worker_leave_pay')
-    .select('*')
-    .eq('worker_id', workerId)
-    .maybeSingle();
-  if (res.error) throw new Error(res.error.message);
-  return res.data as WaaWorkerLeavePay | null;
+  const res = await callHrFn<{ item: WaaWorkerLeavePay | null }>(
+    'waa-hr-worker-detail',
+    { action: 'get_leave_pay', worker_id: workerId },
+    'Could not load leave-pay settings.'
+  );
+  return res.item;
 }
 
 /** The master switch. Off means every leave type resolves to unpaid, full stop. */
@@ -858,26 +920,23 @@ export async function setLeavePayMaster(
   enabled: boolean,
   hrAdminId: string
 ) {
-  const res = await supabase.from('waa_worker_leave_pay').upsert(
-    {
-      worker_id: workerId,
-      paid_leave_enabled: enabled,
-      set_by: hrAdminId,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'worker_id' }
+  void hrAdminId;
+  await callHrFn(
+    'waa-hr-worker-detail',
+    { action: 'set_leave_pay_master', worker_id: workerId, enabled },
+    'Could not save that.'
   );
-  if (res.error) throw new Error(res.error.message);
 }
 
 export async function fetchWorkerLeavePayTypes(
   workerId: string
 ): Promise<WaaWorkerLeavePayType[]> {
-  const res = await supabase
-    .from('waa_worker_leave_pay_types')
-    .select('*')
-    .eq('worker_id', workerId);
-  return unwrap<WaaWorkerLeavePayType[]>(res as never);
+  const res = await callHrFn<{ items: WaaWorkerLeavePayType[] }>(
+    'waa-hr-worker-detail',
+    { action: 'get_leave_pay_types', worker_id: workerId },
+    'Could not load leave-pay types.'
+  );
+  return res.items;
 }
 
 /** Per-type override. Only consulted while the master switch above is on. */
@@ -888,23 +947,21 @@ export async function setLeavePayType(
   hrAdminId: string,
   existingId?: string
 ) {
-  if (existingId) {
-    const res = await supabase
-      .from('waa_worker_leave_pay_types')
-      .update({ enabled, set_by: hrAdminId })
-      .eq('id', existingId);
-    if (res.error) throw new Error(res.error.message);
-    return;
-  }
-  const res = await supabase
-    .from('waa_worker_leave_pay_types')
-    .insert({ worker_id: workerId, leave_type: leaveType, enabled, set_by: hrAdminId });
-  if (res.error) throw new Error(res.error.message);
+  void hrAdminId;
+  await callHrFn(
+    'waa-hr-worker-detail',
+    { action: 'set_leave_pay_type', worker_id: workerId, leave_type: leaveType, enabled, row_id: existingId },
+    'Could not save that.'
+  );
 }
 
 export async function fetchWorkerDeductions(workerId: string): Promise<WaaWorkerDeduction[]> {
-  const res = await supabase.from('waa_worker_deductions').select('*').eq('worker_id', workerId);
-  return unwrap<WaaWorkerDeduction[]>(res as never);
+  const res = await callHrFn<{ items: WaaWorkerDeduction[] }>(
+    'waa-hr-worker-detail',
+    { action: 'get_deductions', worker_id: workerId },
+    'Could not load deduction overrides.'
+  );
+  return res.items;
 }
 
 /** Per-worker deduction override. Persists across periods — set once, not per run. */
@@ -915,21 +972,12 @@ export async function setWorkerDeduction(
   hrAdminId: string,
   existingId?: string
 ) {
-  if (existingId) {
-    const res = await supabase
-      .from('waa_worker_deductions')
-      .update({ enabled, set_by: hrAdminId, updated_at: new Date().toISOString() })
-      .eq('id', existingId);
-    if (res.error) throw new Error(res.error.message);
-    return;
-  }
-  const res = await supabase.from('waa_worker_deductions').insert({
-    worker_id: workerId,
-    deduction_type_id: deductionTypeId,
-    enabled,
-    set_by: hrAdminId,
-  });
-  if (res.error) throw new Error(res.error.message);
+  void hrAdminId;
+  await callHrFn(
+    'waa-hr-worker-detail',
+    { action: 'set_worker_deduction', worker_id: workerId, deduction_type_id: deductionTypeId, enabled, override_id: existingId },
+    'Could not save that.'
+  );
 }
 
 /* ---------------------------------------------------- HR/Admin: sites --- */

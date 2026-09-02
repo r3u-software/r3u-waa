@@ -6,6 +6,7 @@ import { useAsync } from '../../src/lib/useAsync';
 import { fetchProjects } from '../../src/lib/queries';
 import type { WaaProject } from '../../src/lib/types';
 import { ScreenBody, TopBar } from '../../src/components/Screen';
+import { HrDashboardNav } from '../../src/components/HrDashboardNav';
 import {
   Card,
   EmptyState,
@@ -235,6 +236,7 @@ export default function HrAnalytics() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.paper }}>
       <TopBar label="Analytics" />
+      <HrDashboardNav current="analytics" />
       <ScreenBody refreshing={loading} onRefresh={reload}>
         <View style={s.page}>
           <Text style={type.greet}>Analytics</Text>

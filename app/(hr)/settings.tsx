@@ -1,20 +1,21 @@
 /*
- * ORPHANED SCREEN — not reachable from the app's navigation.
+ * Not yet in the web nav — HR-DASHBOARD-RELOCATION-PROPOSAL.md, Stage A.
  *
  * Payroll settings — overtime rates, deduction defaults, cutoff cadence. The
  * addendum lists this as explicitly web-only.
  *
- * Per HR-ADMIN-MOBILE-ACCESS-ADDENDUM.md (resolved as Option A in
- * ADDENDA-PROPOSAL.md), HR/Admin's mobile surface is now exactly three
- * single-decision actions plus Notifications and Profile. This screen belongs
- * to the full HR/Admin surface, which lives on the web dashboard — so nothing
- * in the tab bar or any link points at it any more.
+ * Its data layer is fixed as of this phase: `waa_payroll_settings` reads
+ * were always fine (it has a real per-company SELECT policy); the write
+ * now goes through `waa-hr-settings`'s `update_settings` action.
+ * `waa_deduction_types` (RLS enabled, zero policies at all — fully closed,
+ * not just missing an HR/Admin grant) reads through that same function's
+ * `get_deduction_types` action.
  *
- * It is kept, unwired, as a starting point for that separate web dashboard.
- * As written it CANNOT WORK on mobile: it queries `waa_payroll_settings`, `waa_deduction_types` and `waa_worker_leave_pay_types` directly, and
- * HR/Admin's direct-table RLS grants on those were revoked. Rebuilding it for
- * the web means rewiring every query here onto purpose-built edge functions
- * first.
+ * Correction found while wiring this up: the "Deduction amounts" section
+ * below used to claim these are flat hardcoded pesos in the payroll engine.
+ * Checked the live `waa-generate-payroll-run` source — that was stale.
+ * Amounts come from `waa_deduction_types.default_amount`, a real per-company
+ * column, editable data, not a hardcoded map. Corrected below.
  */
 import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -27,6 +28,7 @@ import {
 } from '../../src/lib/queries';
 import type { CutoffType } from '../../src/lib/types';
 import { ScreenBody } from '../../src/components/Screen';
+import { HrDashboardNav } from '../../src/components/HrDashboardNav';
 import {
   Card,
   ErrorNote,
@@ -123,14 +125,19 @@ export default function HrSettings() {
 
   if (loading && !data) {
     return (
-      <ScreenBody>
-        <Loader label="Loading settings" />
-      </ScreenBody>
+      <>
+        <HrDashboardNav current="settings" />
+        <ScreenBody>
+          <Loader label="Loading settings" />
+        </ScreenBody>
+      </>
     );
   }
 
   return (
-    <ScreenBody refreshing={loading} onRefresh={reload}>
+    <>
+      <HrDashboardNav current="settings" />
+      <ScreenBody refreshing={loading} onRefresh={reload}>
       <Section title="Cutoff cadence">
         {error ? <ErrorNote message={error} /> : null}
         <Card>
@@ -200,9 +207,9 @@ export default function HrSettings() {
             ))}
           </View>
           <Text style={s.note}>
-            These defaults are read-only in the app: `waa_deduction_types` has no HR/Admin UPDATE
-            policy in the deployed schema, so a toggle here would be rejected by the database.
-            Per-worker overrides are fully editable and cover the same ground.
+            These defaults are read-only here for now — no write action for them was built in this
+            pass, this screen only reads them. Per-worker overrides are fully editable via each
+            worker's own profile and cover the same ground.
           </Text>
         </Card>
       </Section>
@@ -210,13 +217,15 @@ export default function HrSettings() {
       <Section title="Deduction amounts">
         <Card>
           <Text style={type.cardSub}>
-            Amounts are flat illustrative pesos hardcoded in the payroll engine — SSS ₱250,
-            Pag-IBIG ₱100, PhilHealth ₱150, Withholding Tax ₱0. Real contribution-table lookups are
-            a later pass; do not treat these as correct figures.
+            Each amount comes from this company's own `waa_deduction_types.default_amount` — real,
+            editable per-company data, not a hardcoded map. Values are still illustrative pesos
+            (SSS, Pag-IBIG, PhilHealth, Withholding Tax) rather than a real contribution-table
+            lookup; do not treat them as legally correct figures yet.
           </Text>
         </Card>
       </Section>
-    </ScreenBody>
+      </ScreenBody>
+    </>
   );
 }
 

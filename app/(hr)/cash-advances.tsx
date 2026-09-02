@@ -1,22 +1,19 @@
 /*
- * ORPHANED SCREEN — not reachable from the app's navigation.
+ * Not yet in the web nav — HR-DASHBOARD-RELOCATION-PROPOSAL.md, Stage A.
  *
  * The full cash-advance ledger (pending + approved + history). Replaced on
  * mobile by `(tabs)/index.tsx`, which does the same approve/decline and
  * proof-of-payout work through `waa-hr-mobile-cash-advances`, one decision at
  * a time and with no browsable history.
  *
- * Per HR-ADMIN-MOBILE-ACCESS-ADDENDUM.md (resolved as Option A in
- * ADDENDA-PROPOSAL.md), HR/Admin's mobile surface is now exactly three
- * single-decision actions plus Notifications and Profile. This screen belongs
- * to the full HR/Admin surface, which lives on the web dashboard — so nothing
- * in the tab bar or any link points at it any more.
- *
- * It is kept, unwired, as a starting point for that separate web dashboard.
- * As written it CANNOT WORK on mobile: it queries `waa_cash_advance_requests` joined to `waa_cash_advance_money` directly, and
- * HR/Admin's direct-table RLS grants on those were revoked. Rebuilding it for
- * the web means rewiring every query here onto purpose-built edge functions
- * first.
+ * Its data layer is fixed as of this phase — reused rather than duplicated:
+ * `fetchAllCashAdvances` now calls that same `waa-hr-mobile-cash-advances`
+ * function's new `list_all` action, and `hrDecideCashAdvance` /
+ * `attachCashAdvanceProof` call its existing `decide` / `mark_paid_out`
+ * actions — already company-scoped, already live-tested by the mobile
+ * screen. See the comments on those functions in `queries.ts` for exactly
+ * how the screen's two-call proof-then-paid-out sequence maps onto that
+ * single `mark_paid_out` action.
  */
 import React, { useState } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -32,6 +29,7 @@ import type { WaaCashAdvanceDetailed } from '../../src/lib/types';
 import { captureDocument, pickImageFromLibrary } from '../../src/lib/capture';
 import { uploadToPath } from '../../src/lib/storage';
 import { ScreenBody } from '../../src/components/Screen';
+import { HrDashboardNav } from '../../src/components/HrDashboardNav';
 import {
   ApproveRow,
   Card,
@@ -114,7 +112,9 @@ export default function HrCashAdvances() {
   }
 
   return (
-    <ScreenBody refreshing={loading} onRefresh={reload}>
+    <>
+      <HrDashboardNav current="cash-advances" />
+      <ScreenBody refreshing={loading} onRefresh={reload}>
       {error ? <ErrorNote message={error} /> : null}
 
       <Section title="Waiting on you">
@@ -270,7 +270,8 @@ export default function HrCashAdvances() {
           </Pressable>
         </Pressable>
       </Modal>
-    </ScreenBody>
+      </ScreenBody>
+    </>
   );
 }
 

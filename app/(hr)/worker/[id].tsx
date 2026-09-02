@@ -1,19 +1,17 @@
 /*
- * ORPHANED SCREEN — not reachable from the app's navigation.
+ * Not yet in the web nav — HR-DASHBOARD-RELOCATION-PROPOSAL.md, Stage A.
  *
  * The full HR/Admin worker detail + editing screen.
  *
- * Per HR-ADMIN-MOBILE-ACCESS-ADDENDUM.md (resolved as Option A in
- * ADDENDA-PROPOSAL.md), HR/Admin's mobile surface is now exactly three
- * single-decision actions plus Notifications and Profile. This screen belongs
- * to the full HR/Admin surface, which lives on the web dashboard — so nothing
- * in the tab bar or any link points at it any more.
- *
- * It is kept, unwired, as a starting point for that separate web dashboard.
- * As written it CANNOT WORK on mobile: it queries `waa_workers`, `waa_worker_pay`, `waa_worker_deductions` and `waa_time_entries` directly, and
- * HR/Admin's direct-table RLS grants on those were revoked. Rebuilding it for
- * the web means rewiring every query here onto purpose-built edge functions
- * first.
+ * Its data layer is fixed as of this phase: every read/write here now goes
+ * through `waa-hr-worker-detail` (company-scoped edge function), including
+ * the rate (`waa_worker_pay`) and leave-pay/deduction overrides that were
+ * fully locked out before. One necessary difference from every other screen
+ * in this batch: `fetchWorkerById` is shared with Supervisor's own
+ * worker-detail screen (which has a real RLS policy for it), so this screen
+ * now calls a distinct `fetchWorkerByIdForHr` instead — see the comment on
+ * both functions in `queries.ts`. Every other query here kept its original
+ * name and signature.
  */
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Switch, Text, View } from 'react-native';
@@ -22,7 +20,7 @@ import { useHrAdmin } from '../../../src/lib/session';
 import { useAsync } from '../../../src/lib/useAsync';
 import {
   fetchDeductionTypes,
-  fetchWorkerById,
+  fetchWorkerByIdForHr,
   fetchWorkerDeductions,
   fetchWorkerLeavePay,
   fetchWorkerLeavePayTypes,
@@ -69,7 +67,7 @@ export default function HrWorkerDetail() {
   const { data, loading, reload } = useAsync(async () => {
     if (!id) return null;
     const [worker, pay, leavePay, leavePayTypes, deductionTypes, deductions] = await Promise.all([
-      fetchWorkerById(id),
+      fetchWorkerByIdForHr(id),
       fetchWorkerPay(id),
       fetchWorkerLeavePay(id),
       fetchWorkerLeavePayTypes(id),

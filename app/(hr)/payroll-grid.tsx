@@ -1,19 +1,18 @@
 /*
- * ORPHANED SCREEN — not reachable from the app's navigation.
+ * Not yet in the web nav — HR-DASHBOARD-RELOCATION-PROPOSAL.md, Stage A.
  *
- * The HR/Admin payroll grid — was `(hr)/(tabs)/index.tsx`, the Payroll tab.
+ * The HR/Admin payroll grid — was `(hr)/(tabs)/index.tsx`, the Payroll tab,
+ * before HR-ADMIN-MOBILE-ACCESS-ADDENDUM.md narrowed HR/Admin's mobile
+ * surface. This screen belongs to the full HR/Admin surface, which lives on
+ * the web dashboard.
  *
- * Per HR-ADMIN-MOBILE-ACCESS-ADDENDUM.md (resolved as Option A in
- * ADDENDA-PROPOSAL.md), HR/Admin's mobile surface is now exactly three
- * single-decision actions plus Notifications and Profile. This screen belongs
- * to the full HR/Admin surface, which lives on the web dashboard — so nothing
- * in the tab bar or any link points at it any more.
- *
- * It is kept, unwired, as a starting point for that separate web dashboard.
- * As written it CANNOT WORK on mobile: it queries `waa_payroll_runs`, `waa_payslips`, `waa_worker_pay` and friends directly, and
- * HR/Admin's direct-table RLS grants on those were revoked. Rebuilding it for
- * the web means rewiring every query here onto purpose-built edge functions
- * first.
+ * Its data layer is fixed as of this phase: run/payslip reads and writes
+ * (status advancement, mark-paid, proof attachment) now go through
+ * `waa-hr-payroll-grid` (company-scoped edge function). The leave-overlap
+ * flag per worker keeps its own separately-fixed path — see
+ * `waa_worker_has_leave_overlap_for_caller` in CLAUDE.md — unchanged here.
+ * The screen itself is unchanged and will render real data the moment it's
+ * linked from somewhere (Stage C of the same proposal).
  */
 import React, { useMemo, useState } from 'react';
 import {
@@ -46,6 +45,7 @@ import type { PayrollRunStatus, WaaPayslipDetailed } from '../../src/lib/types';
 import { captureDocument, pickImageFromLibrary } from '../../src/lib/capture';
 import { uploadToPath } from '../../src/lib/storage';
 import { ScreenBody, TopBar } from '../../src/components/Screen';
+import { HrDashboardNav } from '../../src/components/HrDashboardNav';
 import {
   Card,
   EmptyState,
@@ -260,6 +260,7 @@ export default function HrPayroll() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.paper }}>
       <TopBar label="Payroll" />
+      <HrDashboardNav current="payroll-grid" />
       <ScreenBody refreshing={loading} onRefresh={reload}>
         <Text style={type.greet}>Payroll</Text>
         <Text style={[type.subgreet, { marginBottom: 18 }]}>

@@ -1,22 +1,18 @@
 /*
- * ORPHANED SCREEN — not reachable from the app's navigation.
+ * Not yet in the web nav — HR-DASHBOARD-RELOCATION-PROPOSAL.md, Stage A.
  *
  * The full separation-case view — was `(hr)/(tabs)/separations.tsx`, the
- * Separations tab. Replaced on mobile by `(tabs)/separations.tsx`, which reads
- * the same context through `waa-hr-mobile-separations` and adds the decision
- * note the addendum asks for.
+ * Separations tab. Replaced on mobile by `(tabs)/separations.tsx`, which
+ * reads the same context through `waa-hr-mobile-separations` and adds the
+ * decision note the addendum asks for.
  *
- * Per HR-ADMIN-MOBILE-ACCESS-ADDENDUM.md (resolved as Option A in
- * ADDENDA-PROPOSAL.md), HR/Admin's mobile surface is now exactly three
- * single-decision actions plus Notifications and Profile. This screen belongs
- * to the full HR/Admin surface, which lives on the web dashboard — so nothing
- * in the tab bar or any link points at it any more.
- *
- * It is kept, unwired, as a starting point for that separate web dashboard.
- * As written it CANNOT WORK on mobile: it queries `waa_workers`, `waa_payroll_runs`, `waa_payslips` and `waa_cash_advance_money` directly, and
- * HR/Admin's direct-table RLS grants on those were revoked. Rebuilding it for
- * the web means rewiring every query here onto purpose-built edge functions
- * first.
+ * Its data layer is fixed as of this phase — no dedicated function was
+ * built for this screen; it composes the same three functions built for
+ * the other screens (`waa-hr-roster`'s list actions, `waa-hr-payroll-grid`'s
+ * list actions, and `waa-hr-mobile-cash-advances`'s `list_all`) rather than
+ * duplicating identical company-scoped queries in a fourth. The screen
+ * itself is unchanged and will render real data the moment it's linked from
+ * somewhere (Stage C of the same proposal).
  */
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -32,6 +28,7 @@ import {
 } from '../../src/lib/queries';
 import type { WaaPayslip } from '../../src/lib/types';
 import { ScreenBody, TopBar } from '../../src/components/Screen';
+import { HrDashboardNav } from '../../src/components/HrDashboardNav';
 import { Card, EmptyState, Loader, Pill, Section, StatusStrip } from '../../src/components/ui';
 import { colors, fonts, radius, toneForStatus, type } from '../../src/theme';
 import { initialsOf, periodLabel, peso, relativeStamp } from '../../src/lib/format';
@@ -104,6 +101,7 @@ export default function HrSeparations() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.paper }}>
       <TopBar label="Separations" />
+      <HrDashboardNav current="separations-full" />
       <ScreenBody refreshing={loading} onRefresh={reload}>
         <Text style={type.greet}>Separation cases</Text>
         <Text style={[type.subgreet, { marginBottom: 18 }]}>
