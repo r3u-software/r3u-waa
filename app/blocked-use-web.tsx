@@ -13,16 +13,12 @@ import { SiteIcon } from '../src/components/icons';
  * message"). Neither role has any native screen of their own left to route
  * to once this ships — both work entirely through the web dashboard now.
  *
- * WEB_DASHBOARD_URL is a placeholder until the real GitHub Pages URL
- * exists (WEB-DEPLOYMENT-ADDENDUM.md — that setup is explicitly the user's
- * own responsibility, not something built here). This screen is built and
- * ready, but per the proposal's own explicit gate, the root guard in
- * app/_layout.tsx does NOT route either role here yet — an HR/Admin locked
- * out of their working 3-action mobile surface with nowhere real to go
- * would be strictly worse than today. Wiring that redirect is the one
- * remaining step, held until a real URL is supplied.
+ * WEB_DASHBOARD_URL is now the real, live GitHub Pages deployment —
+ * verified in a real browser end-to-end (real login, real data, nav to
+ * every screen) before this placeholder was replaced. The root guard in
+ * app/_layout.tsx now does route both roles here on native.
  */
-const WEB_DASHBOARD_URL = 'https://TODO-not-yet-deployed.example/';
+const WEB_DASHBOARD_URL = 'https://r3u-software.github.io/r3u-waa/';
 
 export default function BlockedUseWeb() {
   const insets = useSafeAreaInsets();

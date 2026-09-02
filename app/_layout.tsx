@@ -48,6 +48,18 @@ function RootNavigator() {
   const onLogin = group === 'login';
   const onChangePassword = group === 'change-password';
   const onCompleteProfile = group === 'complete-profile';
+  const onBlockedUseWeb = group === 'blocked-use-web';
+
+  /**
+   * HR-ADMIN-WEB-ONLY-ADDENDUM.md: HR/Admin has no native screen at all any
+   * more (supersedes the earlier "3 mobile actions" surface entirely), and
+   * gets "the same treatment as Platform Owner" — both roles now work only
+   * on web; native lands on /blocked-use-web instead of either role group.
+   * Worker and Supervisor are completely untouched by this.
+   */
+  const hrOnTrack = role === 'hr_admin' && (Platform.OS === 'web' ? inHr : onBlockedUseWeb);
+  const platformOwnerOnTrack =
+    role === 'platform_owner' && (Platform.OS === 'web' ? inPlatformOwner : onBlockedUseWeb);
 
   /** Signed in, role resolved, and the temp password hasn't been rotated yet. */
   const mustReset = !!session && !!role && mustChangePassword;
@@ -73,8 +85,8 @@ function RootNavigator() {
       (mustCompleteProfile && !onCompleteProfile) ||
       (clear && role === 'worker' && !inWorker) ||
       (clear && role === 'supervisor' && !inSupervisor) ||
-      (clear && role === 'hr_admin' && !inHr) ||
-      (clear && role === 'platform_owner' && !inPlatformOwner));
+      (clear && role === 'hr_admin' && !hrOnTrack) ||
+      (clear && role === 'platform_owner' && !platformOwnerOnTrack));
 
   useEffect(() => {
     if (loading) return;
@@ -111,18 +123,19 @@ function RootNavigator() {
       router.replace('/(worker)');
     } else if (role === 'supervisor' && !inSupervisor) {
       router.replace('/(supervisor)');
-    } else if (role === 'hr_admin' && !inHr) {
-      // HR-ANALYTICS-ADDENDUM.md / WEB-DEPLOYMENT-ADDENDUM.md: the mobile tab
-      // shell ((tabs)/index.tsx) stays HR/Admin's landing screen on Android --
-      // that part of HR-ADMIN-MOBILE-ACCESS-ADDENDUM.md isn't superseded by
-      // this change. On web, land on the one real full-dashboard screen that
-      // exists so far (analytics) instead. This is the only platform branch
-      // in this file; the rest of HR/Admin's web dashboard (grid, roster,
-      // settings) and any native-side lockout are a separate, not-yet-built
-      // phase -- deliberately not touched here.
-      router.replace(Platform.OS === 'web' ? '/(hr)/analytics' : '/(hr)');
-    } else if (role === 'platform_owner' && !inPlatformOwner) {
-      router.replace('/(platform-owner)');
+    } else if (role === 'hr_admin' && !hrOnTrack) {
+      // HR-ADMIN-WEB-ONLY-ADDENDUM.md (supersedes HR-ADMIN-MOBILE-ACCESS-
+      // ADDENDUM.md's narrower "3 mobile actions" surface entirely): HR/Admin
+      // has no native screen at all any more. Web lands on the full
+      // dashboard; native gets the same block Platform Owner gets below.
+      if (Platform.OS === 'web') router.replace('/(hr)/analytics');
+      else router.replace('/blocked-use-web');
+    } else if (role === 'platform_owner' && !platformOwnerOnTrack) {
+      // Same addendum, "same treatment as Platform Owner" -- now genuinely
+      // mirrored both ways instead of Platform Owner being the only one
+      // actually blocked.
+      if (Platform.OS === 'web') router.replace('/(platform-owner)');
+      else router.replace('/blocked-use-web');
     }
   }, [
     loading,
@@ -134,8 +147,8 @@ function RootNavigator() {
     group,
     inWorker,
     inSupervisor,
-    inHr,
-    inPlatformOwner,
+    hrOnTrack,
+    platformOwnerOnTrack,
     onLogin,
     onChangePassword,
     onCompleteProfile,
