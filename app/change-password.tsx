@@ -1,18 +1,9 @@
 import React, { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { supabase } from '../src/lib/supabase';
 import { useSession } from '../src/lib/session';
-import { colors, fonts, radius, spacing } from '../src/theme';
-import { ErrorNote, Field, PrimaryButton, SecondaryButton } from '../src/components/ui';
-import { LockIcon } from '../src/components/icons';
+import { WebThemeProvider } from '../src/web/webTheme';
+import { AuthShell, GlassButton, GlassErrorBanner, GlassField, GlassFootnote, GlassOutlineButton } from '../src/web/webUi';
 
 /** Deliberately modest — matched to what Supabase Auth itself will accept. */
 const MIN_LENGTH = 8;
@@ -36,9 +27,11 @@ const MIN_LENGTH = 8;
  * step 2 fails on its own the password IS already changed, so the screen says
  * exactly that and offers a sign-out: signing back in with the NEW password
  * lands here again (the flag never cleared), which is a retry, not a dead end.
+ *
+ * Same `AuthShell` glass chrome as login.tsx (own `WebThemeProvider`, fixed
+ * Aurora/dark) — R3U-WAA-WEB-REDESIGN.md's follow-up.
  */
 export default function ChangePasswordScreen() {
-  const insets = useSafeAreaInsets();
   const { refreshProfile, signOut } = useSession();
 
   const [password, setPassword] = useState('');
@@ -94,122 +87,46 @@ export default function ChangePasswordScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={s.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={[s.content, { paddingTop: insets.top + 48 }]}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={s.brandMark}>
-          <LockIcon size={24} color={colors.safety} />
-        </View>
-        <Text style={s.co}>R3U Site Suite</Text>
-        <Text style={s.title}>Set a new password</Text>
-        <Text style={s.tagline}>
-          You are signed in with a temporary password. Choose your own before you continue.
-        </Text>
+    <WebThemeProvider>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView keyboardShouldPersistTaps="handled">
+          <AuthShell
+            eyebrow="R3U SITE SUITE"
+            title="Set a new password"
+            tagline="You are signed in with a temporary password. Choose your own before you continue."
+          >
+            {error ? <GlassErrorBanner message={error} /> : null}
 
-        <View style={s.card}>
-          {error ? <ErrorNote message={error} /> : null}
+            <GlassField
+              label="New password"
+              value={password}
+              onChangeText={setPassword}
+              placeholder="••••••••"
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="new-password"
+              hint={`At least ${MIN_LENGTH} characters. Don't reuse the one you were given.`}
+            />
 
-          <Field
-            label="New password"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="new-password"
-            hint={`At least ${MIN_LENGTH} characters. Don't reuse the one you were given.`}
-          />
+            <GlassField
+              label="Confirm new password"
+              value={confirm}
+              onChangeText={setConfirm}
+              placeholder="••••••••"
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="new-password"
+            />
 
-          <Field
-            label="Confirm new password"
-            value={confirm}
-            onChangeText={setConfirm}
-            placeholder="••••••••"
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="new-password"
-          />
+            <GlassButton label="Save and continue" onPress={submit} loading={busy} disabled={stranded} />
+            <GlassOutlineButton label="Sign out" onPress={signOut} style={{ marginTop: 10 }} />
 
-          <PrimaryButton
-            label={busy ? 'Saving…' : 'Save and continue'}
-            onPress={submit}
-            loading={busy}
-            disabled={stranded}
-          />
-
-          <SecondaryButton
-            label="Sign out"
-            onPress={signOut}
-            style={{ marginTop: 10 }}
-          />
-
-          <Text style={s.footnote}>
-            This is the only screen available until your password is changed.
-          </Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <GlassFootnote>This is the only screen available until your password is changed.</GlassFootnote>
+          </AuthShell>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </WebThemeProvider>
   );
 }
-
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.paper },
-  content: { padding: spacing.xl, paddingBottom: 60, alignItems: 'stretch' },
-  brandMark: {
-    width: 54,
-    height: 54,
-    borderRadius: radius.lg,
-    backgroundColor: colors.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: spacing.lg,
-  },
-  co: {
-    fontSize: 10.5,
-    letterSpacing: 1.3,
-    color: colors.muted,
-    fontFamily: fonts.bodyBold,
-    textAlign: 'center',
-  },
-  title: {
-    fontFamily: fonts.serif,
-    fontSize: 27,
-    fontWeight: '700',
-    color: colors.ink,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  tagline: {
-    fontSize: 12.5,
-    color: colors.muted,
-    textAlign: 'center',
-    marginTop: 6,
-    marginBottom: spacing.xxl,
-    lineHeight: 18,
-    fontFamily: fonts.body,
-    paddingHorizontal: spacing.md,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.hero,
-    padding: spacing.xl,
-  },
-  footnote: {
-    fontSize: 11.5,
-    color: colors.muted,
-    textAlign: 'center',
-    marginTop: spacing.lg,
-    lineHeight: 17,
-    fontFamily: fonts.body,
-  },
-});

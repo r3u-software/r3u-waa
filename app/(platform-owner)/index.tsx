@@ -16,13 +16,12 @@ import {
   Field,
   Loader,
   Pill,
-  PrimaryButton,
-  SecondaryButton,
 } from '../../src/components/ui';
 import { ChevronDownIcon, ChevronRightIcon, LockIcon } from '../../src/components/icons';
 import { colors, fonts, radius, spacing, type } from '../../src/theme';
 import { WebShell } from '../../src/web/WebShell';
-import { WebPageHeader, WebSection } from '../../src/web/webUi';
+import { useWebTheme } from '../../src/web/webTheme';
+import { GlassButton, GlassOutlineButton, WebPageHeader, WebSection } from '../../src/web/webUi';
 
 /**
  * Platform Owner home — three actions, one page.
@@ -220,7 +219,7 @@ function CreateCompanySection({
               hint="Business contact for the company — not an HR/Admin login."
             />
 
-            <PrimaryButton
+            <GlassButton
               label={busy ? 'Creating…' : 'Create company'}
               onPress={submit}
               loading={busy}
@@ -229,7 +228,7 @@ function CreateCompanySection({
             {!complete ? (
               <Text style={s.requireNote}>All six fields are required.</Text>
             ) : null}
-            <SecondaryButton
+            <GlassOutlineButton
               label="Cancel"
               onPress={() => {
                 setForm({ ...EMPTY_FORM });
@@ -336,7 +335,7 @@ function ResetPasswordSection({
                             {!a.profile_complete ? ' · profile incomplete' : ''}
                           </Text>
                         </View>
-                        <SecondaryButton
+                        <GlassOutlineButton
                           label={busyId === a.id ? 'Resetting…' : 'Reset'}
                           onPress={() => confirm(c, a)}
                           disabled={busyId !== null}
@@ -436,10 +435,11 @@ function SuspendSection({
               </Text>
             ) : null}
 
-            <SecondaryButton
+            <GlassButton
               label={
                 busyId === c.id ? 'Saving…' : c.active ? 'Suspend company' : 'Reactivate company'
               }
+              tone={c.active ? 'warn' : 'good'}
               onPress={() => confirm(c)}
               disabled={busyId !== null}
               style={{ marginTop: spacing.md }}
@@ -473,6 +473,11 @@ function CredentialsModal({
   issued: IssuedCredentials | null;
   onDismiss: () => void;
 }) {
+  const { palette } = useWebTheme();
+  const credBoxStyle = [
+    s.credBox,
+    { backgroundColor: palette.panelSolid, borderColor: palette.border, borderWidth: 1 },
+  ];
   return (
     <Modal visible={!!issued} transparent animationType="fade" onRequestClose={onDismiss}>
       <View style={s.backdrop}>
@@ -481,15 +486,15 @@ function CredentialsModal({
             <Text style={s.sheetTitle}>{issued?.heading}</Text>
             <Text style={s.sheetSub}>{issued?.context}</Text>
 
-            <View style={s.credBox}>
-              <Text style={s.credLabel}>HR/ADMIN LOGIN ID</Text>
-              <Text style={s.credValue} selectable>
+            <View style={credBoxStyle}>
+              <Text style={[s.credLabel, { color: palette.muted }]}>HR/ADMIN LOGIN ID</Text>
+              <Text style={[s.credValue, { color: palette.text }]} selectable>
                 {issued?.loginCode}
               </Text>
             </View>
-            <View style={s.credBox}>
-              <Text style={s.credLabel}>TEMPORARY PASSWORD</Text>
-              <Text style={[s.credValue, s.credPassword]} selectable>
+            <View style={credBoxStyle}>
+              <Text style={[s.credLabel, { color: palette.muted }]}>TEMPORARY PASSWORD</Text>
+              <Text style={[s.credValue, { color: palette.accent2 }]} selectable>
                 {issued?.tempPassword}
               </Text>
             </View>
@@ -506,7 +511,7 @@ function CredentialsModal({
               set their own password, then fills in their profile.
             </Text>
 
-            <PrimaryButton
+            <GlassButton
               label="I have copied these down"
               onPress={onDismiss}
               style={{ marginTop: spacing.lg }}
@@ -578,16 +583,14 @@ const s = StyleSheet.create({
     marginBottom: spacing.lg,
     fontFamily: fonts.body,
   },
-  credBox: { backgroundColor: colors.ink, borderRadius: radius.lg, padding: 14, marginBottom: 10 },
+  credBox: { borderRadius: radius.lg, padding: 14, marginBottom: 10 },
   credLabel: {
     fontSize: 10,
     letterSpacing: 1,
-    color: colors.mutedOnDark,
     fontFamily: fonts.bodyBold,
     marginBottom: 5,
   },
-  credValue: { fontSize: 17, color: '#fff', fontFamily: fonts.bodySemi, letterSpacing: 1 },
-  credPassword: { fontSize: 20, color: colors.safety, letterSpacing: 1.5 },
+  credValue: { fontSize: 17, fontFamily: fonts.bodySemi, letterSpacing: 1 },
   warnBox: {
     backgroundColor: colors.warnBg,
     borderRadius: radius.lg,

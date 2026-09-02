@@ -34,14 +34,12 @@ import {
   Field,
   Loader,
   Pill,
-  PrimaryButton,
-  SecondaryButton,
 } from '../../src/components/ui';
 import { SignedImage } from '../../src/components/SignedImage';
 import { colors, fonts, spacing, toneForStatus, type } from '../../src/theme';
 import { peso, relativeStamp } from '../../src/lib/format';
 import { WebShell } from '../../src/web/WebShell';
-import { WebPageHeader, WebSection } from '../../src/web/webUi';
+import { GlassButton, GlassOutlineButton, WebPageHeader, WebSection } from '../../src/web/webUi';
 
 /**
  * Cash advances, end to end: requested -> approved -> paid out -> settled.
@@ -173,10 +171,11 @@ export default function HrCashAdvances() {
                 Attaching proof of the transfer marks this paid out. The database refuses the status
                 change without one.
               </Text>
-              <PrimaryButton
+              <GlassButton
                 label={busyId === a.id ? 'Working…' : 'Attach proof & mark paid out'}
                 onPress={() => askProof(a)}
                 loading={busyId === a.id}
+                tone="good"
                 style={{ marginTop: 12 }}
               />
             </Card>
@@ -241,7 +240,7 @@ export default function HrCashAdvances() {
               placeholder="Why are you declining?"
               multiline
             />
-            <PrimaryButton
+            <GlassButton
               label="Decline request"
               tone="warn"
               onPress={() => {
@@ -258,7 +257,7 @@ export default function HrCashAdvances() {
                 );
               }}
             />
-            <SecondaryButton
+            <GlassOutlineButton
               label="Cancel"
               onPress={() => setDeclining(null)}
               style={{ marginTop: 10 }}

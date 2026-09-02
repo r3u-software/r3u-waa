@@ -28,11 +28,11 @@ import {
   updatePayrollSettings,
 } from '../../src/lib/queries';
 import type { CutoffType } from '../../src/lib/types';
-import { Card, Field, Pill, PrimaryButton } from '../../src/components/ui';
+import { Card, Field, Pill } from '../../src/components/ui';
 import { colors, type as textType } from '../../src/theme';
 import { WebShell } from '../../src/web/WebShell';
 import { useWebTheme } from '../../src/web/webTheme';
-import { Chip, WebPageHeader, WebSection } from '../../src/web/webUi';
+import { Chip, GlassButton, WebPageHeader, WebSection } from '../../src/web/webUi';
 
 const CUTOFFS: { value: CutoffType; label: string }[] = [
   { value: 'weekly', label: 'Weekly' },
@@ -172,7 +172,7 @@ export default function HrSettings() {
                 placeholder="8"
                 hint="Anything logged beyond this in a single day counts as overtime."
               />
-              <PrimaryButton label={busy ? 'Saving…' : 'Save settings'} onPress={save} loading={busy} />
+              <GlassButton label={busy ? 'Saving…' : 'Save settings'} onPress={save} loading={busy} />
             </Card>
           </WebSection>
 

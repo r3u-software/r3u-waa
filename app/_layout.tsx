@@ -3,6 +3,7 @@ import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-nativ
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Slot, useRouter, useSegments } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   Inter_400Regular,
   Inter_600SemiBold,
@@ -10,7 +11,48 @@ import {
   useFonts,
 } from '@expo-google-fonts/inter';
 import { SessionProvider, useSession } from '../src/lib/session';
-import { colors, fonts } from '../src/theme';
+import { resolvePalette } from '../src/web/webTheme';
+
+/**
+ * The one moment every role and every platform sees regardless of the
+ * paper/glass split elsewhere in the app — fonts loading, or the guard
+ * above still resolving session/role. R3U-WAA-WEB-REDESIGN.md's follow-up:
+ * this used to be a flat `colors.ink` screen with an orange brand mark, the
+ * one piece of chrome the glass pass had missed, so the very first thing
+ * anyone saw still looked like the old app. Same fixed Aurora/dark palette
+ * as `AuthShell` (src/web/webUi.tsx) but deliberately not that component
+ * itself — this renders before `SafeAreaProvider`/`SessionProvider` are even
+ * mounted, so it stays dependency-light rather than pulling in
+ * `WebThemeProvider` + safe-area-insets for a screen with no interactive
+ * content and no card. */
+const SPLASH_PALETTE = resolvePalette('aurora', 'dark');
+
+function Splash({ subtitle }: { subtitle?: string }) {
+  return (
+    <View style={[s.splash, { backgroundColor: SPLASH_PALETTE.bg }]}>
+      <LinearGradient
+        colors={[SPLASH_PALETTE.bg, SPLASH_PALETTE.bg2]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View pointerEvents="none" style={[s.glowA, { backgroundColor: SPLASH_PALETTE.accent }]} />
+      <View pointerEvents="none" style={[s.glowB, { backgroundColor: SPLASH_PALETTE.accent2 }]} />
+
+      <LinearGradient
+        colors={[SPLASH_PALETTE.accent, SPLASH_PALETTE.accent2]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={s.splashMark}
+      >
+        <Text style={s.splashMarkText}>R3</Text>
+      </LinearGradient>
+      <Text style={[s.splashBrand, { color: SPLASH_PALETTE.text }]}>R3U</Text>
+      {subtitle ? <Text style={[s.splashName, { color: SPLASH_PALETTE.muted }]}>{subtitle}</Text> : null}
+      <ActivityIndicator color={SPLASH_PALETTE.accent2} style={{ marginTop: 18 }} />
+    </View>
+  );
+}
 
 /**
  * Auth + role guard.
@@ -156,13 +198,7 @@ function RootNavigator() {
   ]);
 
   if (loading || needsRedirect) {
-    return (
-      <View style={s.splash}>
-        <Text style={s.splashBrand}>R3U</Text>
-        <Text style={s.splashName}>Worker's Attendance</Text>
-        <ActivityIndicator color={colors.safety} style={{ marginTop: 18 }} />
-      </View>
-    );
+    return <Splash subtitle="Worker's Attendance" />;
   }
 
   return <Slot />;
@@ -176,12 +212,7 @@ export default function RootLayout() {
   });
 
   if (!fontsLoaded) {
-    return (
-      <View style={s.splash}>
-        <Text style={s.splashBrand}>R3U</Text>
-        <ActivityIndicator color={colors.safety} style={{ marginTop: 18 }} />
-      </View>
-    );
+    return <Splash />;
   }
 
   return (
@@ -197,21 +228,43 @@ export default function RootLayout() {
 const s = StyleSheet.create({
   splash: {
     flex: 1,
-    backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  glowA: {
+    position: 'absolute',
+    top: -140,
+    left: -120,
+    width: 340,
+    height: 340,
+    borderRadius: 999,
+    opacity: 0.22,
+  },
+  glowB: {
+    position: 'absolute',
+    top: 60,
+    right: -140,
+    width: 300,
+    height: 300,
+    borderRadius: 999,
+    opacity: 0.14,
+  },
+  splashMark: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  splashMarkText: { color: '#fff', fontWeight: '800', fontSize: 22 },
   splashBrand: {
-    fontFamily: fonts.serif,
-    fontSize: 40,
+    fontSize: 32,
     fontWeight: '700',
-    color: colors.safety,
     letterSpacing: 1,
   },
   splashName: {
-    fontFamily: fonts.serif,
-    fontSize: 17,
-    color: colors.paper,
+    fontSize: 14,
     marginTop: 4,
   },
 });

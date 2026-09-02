@@ -50,14 +50,13 @@ import {
   ErrorNote,
   Loader,
   Pill,
-  PrimaryButton,
-  SecondaryButton,
   StatusStrip,
 } from '../../src/components/ui';
 import { colors, fonts, radius, spacing, toneForStatus, type } from '../../src/theme';
 import { cutoffFor, hours, periodLabel, peso, toDateColumn } from '../../src/lib/format';
 import { WebShell } from '../../src/web/WebShell';
-import { Chip, WebPageHeader, WebSection } from '../../src/web/webUi';
+import { useWebTheme, webOnlyStyle } from '../../src/web/webTheme';
+import { Chip, GlassButton, GlassOutlineButton, WebPageHeader, WebSection } from '../../src/web/webUi';
 
 /** The lifecycle, in order. `paid` is handled separately — it needs proofs first. */
 const NEXT_STATUS: Record<PayrollRunStatus, PayrollRunStatus | null> = {
@@ -84,6 +83,7 @@ const STATUS_ACTION: Record<string, string> = {
  */
 export default function HrPayroll() {
   const hrAdmin = useHrAdmin();
+  const { palette } = useWebTheme();
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -271,18 +271,18 @@ export default function HrPayroll() {
         {error ? <ErrorNote message={error} /> : null}
 
         <View style={s.actionRow}>
-          <PrimaryButton
+          <GlassButton
             label={run?.status === 'draft' ? 'Regenerate run' : 'Start a run'}
             onPress={openGenerator}
             style={{ flex: 1 }}
           />
-          <SecondaryButton
+          <GlassOutlineButton
             label={`Advances${pendingAdvances.length ? ` (${pendingAdvances.length})` : ''}`}
             onPress={() => router.push('/(hr)/cash-advances')}
             style={{ flex: 1 }}
           />
         </View>
-        <SecondaryButton
+        <GlassOutlineButton
           label="Payroll settings"
           onPress={() => router.push('/(hr)/settings')}
           style={{ marginBottom: 22 }}
@@ -333,11 +333,11 @@ export default function HrPayroll() {
                   </View>
 
                   {next ? (
-                    <PrimaryButton
+                    <GlassButton
                       label={busy ? 'Saving…' : (STATUS_ACTION[next] ?? 'Advance')}
                       onPress={() => advance(next)}
                       loading={busy}
-                      tone={next === 'paid' ? 'ok' : 'safety'}
+                      tone={next === 'paid' ? 'good' : 'accent'}
                       style={{ marginTop: 14 }}
                     />
                   ) : (
@@ -508,10 +508,16 @@ export default function HrPayroll() {
                 )}
 
                 {data!.payslips.length > 0 ? (
-                  <Card style={s.totalCard}>
-                    <Text style={s.totalLabel}>Grand total · net pay</Text>
+                  <View
+                    style={[
+                      s.totalCard,
+                      { backgroundColor: palette.panelSolid, borderColor: palette.border },
+                      webOnlyStyle({ backgroundImage: `linear-gradient(135deg, ${palette.accent}, ${palette.accent2})` }),
+                    ]}
+                  >
+                    <Text style={[s.totalLabel, { color: 'rgba(255,255,255,0.8)' }]}>Grand total · net pay</Text>
                     <Text style={s.totalValue}>{peso(grandTotal)}</Text>
-                  </Card>
+                  </View>
                 ) : null}
               </>
             ) : null}
@@ -575,13 +581,13 @@ export default function HrPayroll() {
                 </Pressable>
               ) : null}
 
-              <PrimaryButton
+              <GlassButton
                 label={generating ? 'Generating…' : 'Generate'}
                 onPress={doGenerate}
                 loading={generating}
                 style={{ marginTop: spacing.md }}
               />
-              <SecondaryButton
+              <GlassOutlineButton
                 label="Cancel"
                 onPress={() => setShowGenerator(false)}
                 style={{ marginTop: 10 }}
@@ -650,7 +656,7 @@ function Breakdown({
       {slip.proof_url ? (
         <Text style={s.proofOk}>Proof of payment attached.</Text>
       ) : (
-        <SecondaryButton
+        <GlassOutlineButton
           label={uploading ? 'Uploading…' : 'Attach proof of payment'}
           onPress={onAttachProof}
           disabled={uploading}
@@ -742,18 +748,18 @@ const s = StyleSheet.create({
   proofOk: { fontSize: 11.5, color: colors.ok, marginTop: 12, fontFamily: fonts.bodySemi },
 
   totalCard: {
-    backgroundColor: colors.ink,
-    borderColor: colors.ink,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 18,
     gap: 3,
     marginBottom: 30,
   },
   totalLabel: {
     fontSize: 10.5,
     letterSpacing: 1,
-    color: colors.mutedOnDark,
     fontFamily: fonts.bodySemi,
   },
-  totalValue: { fontFamily: fonts.serif, fontSize: 30, fontWeight: '700', color: colors.safety },
+  totalValue: { fontFamily: fonts.serif, fontSize: 30, fontWeight: '700', color: '#fff' },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(28,27,24,0.5)', justifyContent: 'flex-end' },
   sheet: {

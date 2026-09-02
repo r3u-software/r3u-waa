@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { supabase } from '../src/lib/supabase';
 import { useSession } from '../src/lib/session';
-import { colors, fonts, radius, spacing } from '../src/theme';
-import { ErrorNote, Field, PrimaryButton, SecondaryButton } from '../src/components/ui';
-import { IdCardIcon } from '../src/components/icons';
+import { WebThemeProvider } from '../src/web/webTheme';
+import {
+  AuthShell,
+  GlassButton,
+  GlassCallout,
+  GlassErrorBanner,
+  GlassField,
+  GlassFootnote,
+  GlassOutlineButton,
+} from '../src/web/webUi';
 
 /**
  * HR/Admin profile completion — the step between the forced password reset and
@@ -28,7 +27,9 @@ import { IdCardIcon } from '../src/components/icons';
  * `profile_complete = false` here, ahead of the (hr) redirect, so this screen
  * is not reachable by choice and cannot be navigated past. It is HR/Admin-only
  * — Worker and Supervisor never reach it; their own onboarding is unchanged and
- * lives inside their own route groups.
+ * lives inside their own route groups. HR/Admin is web-only, so unlike the
+ * other three auth screens this one in practice only ever renders on web —
+ * it still shares the same `AuthShell` chrome for consistency either way.
  *
  * The write goes through the `waa_hr_admins_update_own` RLS policy
  * (`auth_user_id = auth.uid()`) rather than an edge function: unlike the
@@ -40,7 +41,6 @@ import { IdCardIcon } from '../src/components/icons';
  * below so they can write it down, never as an editable field.
  */
 export default function CompleteProfileScreen() {
-  const insets = useSafeAreaInsets();
   const { hrAdmin, refreshProfile, signOut } = useSession();
 
   const [fullName, setFullName] = useState(hrAdmin?.full_name ?? '');
@@ -109,157 +109,59 @@ export default function CompleteProfileScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={s.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={[s.content, { paddingTop: insets.top + 48 }]}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={s.brandMark}>
-          <IdCardIcon size={24} color={colors.safety} />
-        </View>
-        <Text style={s.co}>R3U Site Suite</Text>
-        <Text style={s.title}>Complete your profile</Text>
-        <Text style={s.tagline}>
-          Your account was created for you with a login code only. Add your details to finish
-          setting it up.
-        </Text>
+    <WebThemeProvider>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView keyboardShouldPersistTaps="handled">
+          <AuthShell
+            eyebrow="R3U SITE SUITE"
+            title="Complete your profile"
+            tagline="Your account was created for you with a login code only. Add your details to finish setting it up."
+          >
+            {error ? <GlassErrorBanner message={error} /> : null}
 
-        <View style={s.card}>
-          {error ? <ErrorNote message={error} /> : null}
+            {hrAdmin?.login_code ? (
+              <GlassCallout
+                label="YOUR LOGIN ID"
+                value={hrAdmin.login_code}
+                note="Save this — it is how you sign in from now on, and it never changes. The email below is contact information only, not a second way in."
+              />
+            ) : null}
 
-          {hrAdmin?.login_code ? (
-            <View style={s.codeBox}>
-              <Text style={s.codeLabel}>Your login ID</Text>
-              <Text style={s.codeValue} selectable>
-                {hrAdmin.login_code}
-              </Text>
-              <Text style={s.codeHint}>
-                Save this — it is how you sign in from now on, and it never changes. The email
-                below is contact information only, not a second way in.
-              </Text>
-            </View>
-          ) : null}
+            <GlassField
+              label="Full name"
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Maria Santos"
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
 
-          <Field
-            label="Full name"
-            value={fullName}
-            onChangeText={setFullName}
-            placeholder="Maria Santos"
-            autoCapitalize="words"
-            autoCorrect={false}
-          />
+            <GlassField
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@company.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              hint="Where R3U can reach you. Not used to sign in."
+            />
 
-          <Field
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@company.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            hint="Where R3U can reach you. Not used to sign in."
-          />
+            <GlassField
+              label="Phone number"
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="09XX XXX XXXX"
+              keyboardType="phone-pad"
+            />
 
-          <Field
-            label="Phone number"
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="09XX XXX XXXX"
-            keyboardType="phone-pad"
-          />
+            <GlassButton label="Save and continue" onPress={submit} loading={busy} />
+            <GlassOutlineButton label="Sign out" onPress={signOut} style={{ marginTop: 10 }} />
 
-          <PrimaryButton
-            label={busy ? 'Saving…' : 'Save and continue'}
-            onPress={submit}
-            loading={busy}
-          />
-
-          <SecondaryButton label="Sign out" onPress={signOut} style={{ marginTop: 10 }} />
-
-          <Text style={s.footnote}>
-            This is the only screen available until your profile is complete.
-          </Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <GlassFootnote>This is the only screen available until your profile is complete.</GlassFootnote>
+          </AuthShell>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </WebThemeProvider>
   );
 }
-
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.paper },
-  content: { padding: spacing.xl, paddingBottom: 60, alignItems: 'stretch' },
-  brandMark: {
-    width: 54,
-    height: 54,
-    borderRadius: radius.lg,
-    backgroundColor: colors.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: spacing.lg,
-  },
-  co: {
-    fontSize: 10.5,
-    letterSpacing: 1.3,
-    color: colors.muted,
-    fontFamily: fonts.bodyBold,
-    textAlign: 'center',
-  },
-  title: {
-    fontFamily: fonts.serif,
-    fontSize: 27,
-    fontWeight: '700',
-    color: colors.ink,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  tagline: {
-    fontSize: 12.5,
-    color: colors.muted,
-    textAlign: 'center',
-    marginTop: 6,
-    marginBottom: spacing.xxl,
-    lineHeight: 18,
-    fontFamily: fonts.body,
-    paddingHorizontal: spacing.md,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.hero,
-    padding: spacing.xl,
-  },
-  codeBox: {
-    backgroundColor: colors.ink,
-    borderRadius: radius.lg,
-    padding: 14,
-    marginBottom: spacing.lg,
-  },
-  codeLabel: {
-    fontSize: 10,
-    letterSpacing: 1,
-    color: colors.mutedOnDark,
-    fontFamily: fonts.bodyBold,
-    marginBottom: 5,
-  },
-  codeValue: { fontSize: 20, color: colors.safety, letterSpacing: 1.5, fontFamily: fonts.bodyBold },
-  codeHint: {
-    fontSize: 11,
-    color: colors.mutedOnDark,
-    lineHeight: 16,
-    marginTop: 7,
-    fontFamily: fonts.body,
-  },
-  footnote: {
-    fontSize: 11.5,
-    color: colors.muted,
-    textAlign: 'center',
-    marginTop: spacing.lg,
-    lineHeight: 17,
-    fontFamily: fonts.body,
-  },
-});

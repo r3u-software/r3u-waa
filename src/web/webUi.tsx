@@ -1,6 +1,8 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Line, LinearGradient, Polygon, Polyline, Stop } from 'react-native-svg';
+import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import { useWebTheme, webOnlyStyle, WebPalette } from './webTheme';
 
 /**
@@ -201,6 +203,217 @@ export function AreaChart({
       <Polyline points={linePoints} fill="none" stroke={palette.accent} strokeWidth={2.5} />
       <Circle cx={last.x} cy={last.y} r={4.5} fill={palette.accent2} />
     </Svg>
+  );
+}
+
+/* -------------------------------------------------------------- Buttons --- */
+/* Replaces `ui.tsx`'s PrimaryButton/SecondaryButton (default orange
+ * `colors.safety`) everywhere on the glass shell — that orange is the native
+ * paper app's brand color, correct there, and a jarring leftover here. */
+
+export function GlassButton({
+  label,
+  onPress,
+  disabled,
+  loading,
+  tone = 'accent',
+  style,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  /** 'accent' is the brand gradient (the default, for the primary action on
+   * a screen). 'good'/'warn' are solid semantic colors — an affirming action
+   * (mark paid) or a destructive one (decline) shouldn't wear the same
+   * gradient as "Save settings" does. */
+  tone?: 'accent' | 'good' | 'warn';
+  style?: ViewStyle;
+}) {
+  const { palette } = useWebTheme();
+  const isOff = disabled || loading;
+  const grad: [string, string] =
+    tone === 'good' ? [palette.good, palette.good] : tone === 'warn' ? [palette.bad, palette.bad] : [palette.accent, palette.accent2];
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={isOff}
+      style={({ pressed }) => [
+        { borderRadius: 13, overflow: 'hidden' } as ViewStyle,
+        isOff && { opacity: 0.55 },
+        pressed && !isOff && { opacity: 0.88 },
+        style,
+      ]}
+    >
+      <ExpoLinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s2.btnFill}>
+        {loading ? <ActivityIndicator color="#fff" /> : <Text style={s2.btnText}>{label}</Text>}
+      </ExpoLinearGradient>
+    </Pressable>
+  );
+}
+
+export function GlassOutlineButton({
+  label,
+  onPress,
+  disabled,
+  style,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  style?: ViewStyle;
+}) {
+  const { palette } = useWebTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        s2.btnFill,
+        { borderRadius: 13, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.panel },
+        disabled && { opacity: 0.55 },
+        pressed && !disabled && { backgroundColor: palette.hover },
+        style,
+      ]}
+    >
+      <Text style={{ color: palette.text, fontSize: 14.5, fontWeight: '700' }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const s2 = StyleSheet.create({
+  btnFill: { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  btnText: { color: '#fff', fontSize: 14.5, fontWeight: '700' },
+  authRoot: { flex: 1 },
+  authContent: { width: '100%', maxWidth: 440, alignSelf: 'center', padding: 22, paddingBottom: 60 },
+  authBrandMark: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 18 },
+  authBrandMarkText: { color: '#fff', fontWeight: '800', fontSize: 22 },
+  authCard: { borderRadius: 22, padding: 22, borderWidth: 1, overflow: 'hidden' },
+  glowA: { position: 'absolute', top: -140, left: -120, width: 340, height: 340, borderRadius: 999, opacity: 0.22 },
+  glowB: { position: 'absolute', top: 60, right: -140, width: 300, height: 300, borderRadius: 999, opacity: 0.14 },
+});
+
+/* ---------------------------------------------------------------- Field --- */
+
+export function GlassField({
+  label,
+  hint,
+  ...props
+}: React.ComponentProps<typeof TextInput> & { label: string; hint?: string }) {
+  const { palette } = useWebTheme();
+  return (
+    <View style={{ marginBottom: 16 }}>
+      <Text style={{ fontSize: 11, fontWeight: '700', color: palette.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 7 }}>
+        {label}
+      </Text>
+      <TextInput
+        placeholderTextColor={palette.muted}
+        {...props}
+        style={[
+          {
+            backgroundColor: palette.hover,
+            borderWidth: 1,
+            borderColor: palette.border,
+            borderRadius: 13,
+            paddingHorizontal: 14,
+            paddingVertical: 13,
+            fontSize: 14.5,
+            color: palette.text,
+          },
+          props.style,
+        ]}
+      />
+      {hint ? <Text style={{ fontSize: 11.5, color: palette.muted, marginTop: 6 }}>{hint}</Text> : null}
+    </View>
+  );
+}
+
+/* ---------------------------------------------------------------- Error --- */
+
+export function GlassErrorBanner({ message }: { message: string }) {
+  const { palette } = useWebTheme();
+  return (
+    <View style={{ backgroundColor: palette.badBg, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+      <Text style={{ color: palette.bad, fontSize: 12.5, lineHeight: 18, fontWeight: '600' }}>{message}</Text>
+    </View>
+  );
+}
+
+/** Label / big value / note panel — the login-code callout on
+ * complete-profile.tsx, the dashboard-URL callout on blocked-use-web.tsx. */
+export function GlassCallout({ label, value, note }: { label: string; value: string; note?: string }) {
+  const { palette } = useWebTheme();
+  return (
+    <View style={{ backgroundColor: palette.hover, borderRadius: 13, padding: 14, marginBottom: 16 }}>
+      <Text style={{ fontSize: 10, letterSpacing: 1, color: palette.muted, fontWeight: '700', marginBottom: 5 }}>
+        {label}
+      </Text>
+      <Text selectable style={{ fontSize: 19, color: palette.accent2, fontWeight: '700', letterSpacing: 1 }}>
+        {value}
+      </Text>
+      {note ? <Text style={{ fontSize: 11, color: palette.muted, lineHeight: 16, marginTop: 7 }}>{note}</Text> : null}
+    </View>
+  );
+}
+
+/** Small centered note under the form — "New here? Ask your…", "This is the
+ * only screen available until…", etc. */
+export function GlassFootnote({ children }: { children: React.ReactNode }) {
+  const { palette } = useWebTheme();
+  return (
+    <Text style={{ fontSize: 11.5, color: palette.muted, textAlign: 'center', marginTop: 16, lineHeight: 17 }}>
+      {children}
+    </Text>
+  );
+}
+
+/* ------------------------------------------------------------ Auth shell --- */
+/* Shared full-screen chrome for login / change-password / complete-profile /
+ * blocked-use-web: gradient background, two soft accent glow blobs, a
+ * gradient brand mark, and a blurred glass card. Each of those screens is
+ * wrapped in its own `WebThemeProvider` (fixed to Aurora/dark — there is no
+ * session yet at that point, so no per-user theme choice to read) and
+ * renders through this one implementation instead of four copies of the
+ * same styling. */
+
+export function AuthShell({
+  eyebrow,
+  title,
+  tagline,
+  brandGlyph,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  tagline: string;
+  brandGlyph?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const { palette } = useWebTheme();
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[s2.authRoot, { backgroundColor: palette.bg }]}>
+      <ExpoLinearGradient colors={[palette.bg, palette.bg2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill as ViewStyle} />
+      <View pointerEvents="none" style={[s2.glowA, { backgroundColor: palette.accent }]} />
+      <View pointerEvents="none" style={[s2.glowB, { backgroundColor: palette.accent2 }]} />
+
+      <View style={[s2.authContent, { paddingTop: insets.top + 48 }]}>
+        <ExpoLinearGradient colors={[palette.accent, palette.accent2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s2.authBrandMark}>
+          {brandGlyph ?? <Text style={s2.authBrandMarkText}>R3</Text>}
+        </ExpoLinearGradient>
+        <Text style={{ fontSize: 11, letterSpacing: 1.6, color: palette.muted, fontWeight: '700', textAlign: 'center' }}>
+          {eyebrow}
+        </Text>
+        <Text style={{ fontSize: 26, fontWeight: '700', color: palette.text, textAlign: 'center', marginTop: 4 }}>
+          {title}
+        </Text>
+        <Text style={{ fontSize: 12.5, color: palette.muted, textAlign: 'center', marginTop: 6, marginBottom: 26, lineHeight: 18, paddingHorizontal: 8 }}>
+          {tagline}
+        </Text>
+
+        <View style={[s2.authCard, { borderColor: palette.border, backgroundColor: palette.panel }]}>{children}</View>
+      </View>
+    </View>
   );
 }
 

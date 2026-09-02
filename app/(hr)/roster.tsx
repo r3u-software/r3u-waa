@@ -24,14 +24,13 @@ import {
   EmptyState,
   Loader,
   Pill,
-  PrimaryButton,
   StatusStrip,
 } from '../../src/components/ui';
 import { colors, fonts, radius, toneForStatus } from '../../src/theme';
 import { initialsOf } from '../../src/lib/format';
 import { WebShell } from '../../src/web/WebShell';
 import { useWebTheme } from '../../src/web/webTheme';
-import { Chip, WebPageHeader, WebSection } from '../../src/web/webUi';
+import { Chip, GlassButton, WebPageHeader, WebSection } from '../../src/web/webUi';
 
 /**
  * There is no "which workers report to which supervisor" table; the grouping
@@ -97,7 +96,7 @@ export default function HrRoster() {
         ]}
       />
 
-      <PrimaryButton
+      <GlassButton
         label="Register a supervisor"
         onPress={() => router.push('/(hr)/register-supervisor')}
         style={{ marginBottom: 18 }}

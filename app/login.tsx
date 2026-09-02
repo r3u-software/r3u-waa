@@ -1,21 +1,9 @@
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
+import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '../src/lib/supabase';
 import { useSession } from '../src/lib/session';
-import { resolvePalette } from '../src/web/webTheme';
+import { WebThemeProvider } from '../src/web/webTheme';
+import { AuthShell, GlassButton, GlassErrorBanner, GlassField, GlassFootnote } from '../src/web/webUi';
 
 /**
  * One form for all four roles — no role switcher.
@@ -37,25 +25,17 @@ import { resolvePalette } from '../src/web/webTheme';
  * Once `setSession` lands, the root guard in `_layout.tsx` resolves the role
  * from the session and routes to the matching group on its own.
  *
- * Visual layer only, R3U-WAA-WEB-REDESIGN.md's follow-up: this is the one
- * screen every role sees on every platform, so unlike the rest of that pass
- * (web-only), it now carries the glass look on native too — `expo-blur` +
- * `expo-linear-gradient`, the two new dependencies that made that possible.
- * It intentionally still uses a fixed Aurora/dark palette rather than
- * `useWebTheme()`: there is no session yet at this point, so no
- * `WebThemeProvider` is mounted (that context lives inside `(hr)` and
- * `(platform-owner)`'s own layouts), and a login screen isn't where a
- * returning user would expect to find their theme switcher anyway. One
- * acknowledged seam this leaves: Worker/Supervisor land here in the same
- * glass look, then the very next screen (their actual native Home/Pay/etc.)
- * is still the original paper theme — reskinning those screens is a
- * separate, materially bigger piece of work that was not commissioned here.
+ * Visual layer only, R3U-WAA-WEB-REDESIGN.md's follow-up: renders through
+ * `AuthShell` (src/web/webUi.tsx) — the same glass chrome as
+ * change-password.tsx / complete-profile.tsx / blocked-use-web.tsx, and on
+ * native as well as web (`expo-blur` + `expo-linear-gradient` both ship
+ * their own web implementations, so nothing here branches on `Platform.OS`).
+ * `WebThemeProvider` is mounted fresh right here rather than inherited: there
+ * is no session yet at this point, so no per-user theme choice to read
+ * (that context otherwise only lives inside `(hr)`/`(platform-owner)`'s own
+ * layouts) — it defaults to Aurora/dark, same as every other auth screen.
  */
-
-const P = resolvePalette('aurora', 'dark');
-
 export default function LoginScreen() {
-  const insets = useSafeAreaInsets();
   const { roleError } = useSession();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -114,26 +94,12 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={s.root}>
-      <LinearGradient colors={[P.bg, P.bg2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-      <View pointerEvents="none" style={s.glowA} />
-      <View pointerEvents="none" style={s.glowB} />
-
-      <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          contentContainerStyle={[s.content, { paddingTop: insets.top + 48 }]}
-          keyboardShouldPersistTaps="handled"
-        >
-          <LinearGradient colors={[P.accent, P.accent2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.brandMark}>
-            <Text style={s.brandMarkText}>R3</Text>
-          </LinearGradient>
-          <Text style={s.co}>R3U SITE SUITE</Text>
-          <Text style={s.title}>Worker's Attendance</Text>
-          <Text style={s.tagline}>One Platform. Every Business.</Text>
-
-          <BlurView intensity={44} tint="dark" style={s.card}>
-            {roleError ? <ErrorBanner message={roleError} /> : null}
-            {error ? <ErrorBanner message={error} /> : null}
+    <WebThemeProvider>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView keyboardShouldPersistTaps="handled">
+          <AuthShell eyebrow="R3U SITE SUITE" title="Worker's Attendance" tagline="One Platform. Every Business.">
+            {roleError ? <GlassErrorBanner message={roleError} /> : null}
+            {error ? <GlassErrorBanner message={error} /> : null}
 
             <GlassField
               label="Phone, login ID or email"
@@ -158,104 +124,14 @@ export default function LoginScreen() {
               autoComplete="current-password"
             />
 
-            <Pressable onPress={submit} disabled={busy} style={({ pressed }) => [s.submitWrap, pressed && !busy && { opacity: 0.85 }]}>
-              <LinearGradient colors={[P.accent, P.accent2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submit}>
-                {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.submitText}>Sign in</Text>}
-              </LinearGradient>
-            </Pressable>
+            <GlassButton label="Sign in" onPress={submit} loading={busy} />
 
-            <Text style={s.footnote}>
+            <GlassFootnote>
               New here? Ask your supervisor or HR/Admin for your login — there is no self sign-up.
-            </Text>
-          </BlurView>
+            </GlassFootnote>
+          </AuthShell>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </WebThemeProvider>
   );
 }
-
-function ErrorBanner({ message }: { message: string }) {
-  return (
-    <View style={s.errorBox}>
-      <Text style={s.errorText}>{message}</Text>
-    </View>
-  );
-}
-
-function GlassField({
-  label,
-  hint,
-  ...props
-}: React.ComponentProps<typeof TextInput> & { label: string; hint?: string }) {
-  return (
-    <View style={{ marginBottom: 16 }}>
-      <Text style={s.fieldLabel}>{label}</Text>
-      <TextInput placeholderTextColor={P.muted} {...props} style={s.input} />
-      {hint ? <Text style={s.fieldHint}>{hint}</Text> : null}
-    </View>
-  );
-}
-
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: P.bg, overflow: 'hidden' },
-  flex: { flex: 1 },
-  content: { padding: 22, paddingBottom: 60, alignItems: 'stretch', width: '100%', maxWidth: 440, alignSelf: 'center' },
-  glowA: {
-    position: 'absolute',
-    top: -140,
-    left: -120,
-    width: 340,
-    height: 340,
-    borderRadius: 999,
-    backgroundColor: P.accent,
-    opacity: 0.22,
-  },
-  glowB: {
-    position: 'absolute',
-    top: 60,
-    right: -140,
-    width: 300,
-    height: 300,
-    borderRadius: 999,
-    backgroundColor: P.accent2,
-    opacity: 0.14,
-  },
-  brandMark: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: 18,
-  },
-  brandMarkText: { color: '#fff', fontWeight: '800', fontSize: 22 },
-  co: { fontSize: 11, letterSpacing: 1.6, color: P.muted, fontWeight: '700', textAlign: 'center' },
-  title: { fontSize: 26, fontWeight: '700', color: P.text, textAlign: 'center', marginTop: 4 },
-  tagline: { fontSize: 12.5, color: P.muted, textAlign: 'center', marginTop: 4, marginBottom: 28 },
-  card: {
-    borderRadius: 22,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: P.border,
-    overflow: 'hidden',
-  },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: P.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 7 },
-  fieldHint: { fontSize: 11.5, color: P.muted, marginTop: 6 },
-  input: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: P.border,
-    borderRadius: 13,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontSize: 14.5,
-    color: P.text,
-  },
-  submitWrap: { marginTop: 6, borderRadius: 14, overflow: 'hidden' },
-  submit: { paddingVertical: 15, alignItems: 'center', justifyContent: 'center' },
-  submitText: { color: '#fff', fontSize: 14.5, fontWeight: '700' },
-  footnote: { fontSize: 11.5, color: P.muted, textAlign: 'center', marginTop: 16, lineHeight: 17 },
-  errorBox: { backgroundColor: P.badBg, borderRadius: 12, padding: 12, marginBottom: 14 },
-  errorText: { color: P.bad, fontSize: 12.5, lineHeight: 18, fontWeight: '600' },
-});
