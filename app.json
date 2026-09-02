@@ -41,6 +41,9 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
+    "experiments": {
+      "baseUrl": "/r3u-waa"
+    },
     "plugins": [
       "expo-router",
       "expo-font",
