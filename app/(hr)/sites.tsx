@@ -1,23 +1,22 @@
 import React, { useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, ScrollView, Text, View } from 'react-native';
 import { useSession } from '../../src/lib/session';
 import { useAsync } from '../../src/lib/useAsync';
 import { createSite, fetchProjects, updateSite } from '../../src/lib/queries';
 import type { WaaProject } from '../../src/lib/types';
-import { PageHeader, ScreenBody } from '../../src/components/Screen';
+import { EmptyState } from '../../src/components/ui';
+import { MapPinIcon } from '../../src/components/icons';
+import { useWebTheme } from '../../src/web/webTheme';
 import {
-  Card,
-  EmptyState,
-  ErrorNote,
-  Field,
-  ListCard,
-  Loader,
-  PrimaryButton,
-  SecondaryButton,
-  Section,
-} from '../../src/components/ui';
-import { MapPinIcon, SiteGlyph } from '../../src/components/icons';
-import { colors, fonts, radius, spacing } from '../../src/theme';
+  GlassButton,
+  GlassCard,
+  GlassErrorBanner,
+  GlassField,
+  GlassListRow,
+  GlassOutlineButton,
+  GlassScreen,
+  WebPageHeader,
+} from '../../src/web/webUi';
 
 /**
  * HR/Admin site management — the one in-app way to create a `waa_projects` row.
@@ -37,9 +36,12 @@ import { colors, fonts, radius, spacing } from '../../src/theme';
  * company-scoped, so what comes back is this company's sites and nothing else.
  * No client-side company filter is layered on top of that, deliberately — it
  * would imply the boundary lives here rather than in the database.
+ *
+ * Reskinned onto the glass system — R3U-WAA-WEB-REDESIGN.md's follow-up.
  */
 export default function HrSitesScreen() {
   const { companyId } = useSession();
+  const { palette } = useWebTheme();
   const { data: sites, loading, error, reload } = useAsync(() => fetchProjects(), []);
 
   /** null = closed, 'new' = create form, otherwise the site being edited. */
@@ -47,53 +49,41 @@ export default function HrSitesScreen() {
 
   return (
     <>
-      <ScreenBody refreshing={loading} onRefresh={reload}>
-        <PageHeader
-          eyebrow="COMPANY SETUP"
-          title="Sites"
-          sub="The projects your workers are assigned to and punch against."
-        />
+      <GlassScreen>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40, maxWidth: 640, width: '100%', alignSelf: 'center' }}>
+          <WebPageHeader eyebrow="Company setup" title="Sites" sub="The projects your workers are assigned to and punch against." />
 
-        {error ? <ErrorNote message={error} /> : null}
+          {error ? <GlassErrorBanner message={error} /> : null}
 
-        <PrimaryButton
-          label="New site"
-          onPress={() => setEditing('new')}
-          style={{ marginBottom: spacing.xxl }}
-        />
+          <GlassButton label="New site" onPress={() => setEditing('new')} style={{ marginBottom: 22 }} />
 
-        <Section title={`Your sites${sites ? ` (${sites.length})` : ''}`}>
-          {loading && !sites ? (
-            <Loader label="Loading sites…" />
-          ) : (sites?.length ?? 0) === 0 ? (
-            <EmptyState
-              title="No sites yet"
-              body="Add your first site so supervisors have somewhere to register workers."
-            />
+          <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text, marginBottom: 10 }}>
+            Your sites{sites ? ` (${sites.length})` : ''}
+          </Text>
+          {(sites?.length ?? 0) === 0 ? (
+            <EmptyState title="No sites yet" body="Add your first site so supervisors have somewhere to register workers." />
           ) : (
             sites!.map((site) => (
-              <ListCard
+              <GlassListRow
                 key={site.id}
-                icon={<SiteGlyph size={17} color={colors.safetyDeep} />}
-                iconBg={colors.pendingBg}
+                icon={<MapPinIcon size={17} color={palette.text} />}
                 title={site.name}
                 subtitle={site.location || 'No location set'}
                 onPress={() => setEditing(site)}
                 pillLabel="Edit"
-                tone="muted"
               />
             ))
           )}
-        </Section>
 
-        <Card style={s.note}>
-          <MapPinIcon size={17} color={colors.steel} />
-          <Text style={s.noteText}>
-            A site's location is a plain label for people to read — punches record their own GPS
-            separately and are never blocked by distance from it.
-          </Text>
-        </Card>
-      </ScreenBody>
+          <GlassCard style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginTop: 8 }}>
+            <MapPinIcon size={17} color={palette.muted} />
+            <Text style={{ flex: 1, fontSize: 11.5, color: palette.muted, lineHeight: 17 }}>
+              A site's location is a plain label for people to read — punches record their own GPS separately and are never blocked by
+              distance from it.
+            </Text>
+          </GlassCard>
+        </ScrollView>
+      </GlassScreen>
 
       {/* Keyed + conditionally mounted so each open starts from that site's
           own values rather than whatever the previous open left behind. */}
@@ -126,6 +116,7 @@ function SiteFormModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { palette } = useWebTheme();
   const isNew = target === 'new';
   const existing = target !== 'new' ? target : null;
 
@@ -176,29 +167,20 @@ function SiteFormModal({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={s.backdrop}>
-        <View style={s.sheet}>
-          <ScrollView
-            contentContainerStyle={{ padding: spacing.xl }}
-            keyboardShouldPersistTaps="handled"
-          >
-            <Text style={s.sheetTitle}>{isNew ? 'New site' : 'Edit site'}</Text>
-            <Text style={s.sheetSub}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
+        <View style={{ backgroundColor: palette.panelSolid, borderWidth: 1, borderColor: palette.border, borderRadius: 20, maxHeight: '85%' }}>
+          <ScrollView contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
+            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>{isNew ? 'New site' : 'Edit site'}</Text>
+            <Text style={{ fontSize: 12.5, color: palette.muted, lineHeight: 18, marginTop: 4, marginBottom: 16 }}>
               {isNew
                 ? 'Supervisors pick from this list when they register a worker.'
                 : 'Renaming a site updates it everywhere — existing punches and assignments stay attached.'}
             </Text>
 
-            {error ? <ErrorNote message={error} /> : null}
+            {error ? <GlassErrorBanner message={error} /> : null}
 
-            <Field
-              label="Site name"
-              value={name}
-              onChangeText={setName}
-              placeholder="Ortigas Tower 3"
-              autoCapitalize="words"
-            />
-            <Field
+            <GlassField label="Site name" value={name} onChangeText={setName} placeholder="Ortigas Tower 3" autoCapitalize="words" />
+            <GlassField
               label="Location"
               value={location}
               onChangeText={setLocation}
@@ -207,42 +189,11 @@ function SiteFormModal({
               hint="Optional. A human-readable address or area."
             />
 
-            <PrimaryButton
-              label={busy ? 'Saving…' : isNew ? 'Create site' : 'Save changes'}
-              onPress={submit}
-              loading={busy}
-            />
-            <SecondaryButton label="Cancel" onPress={onClose} style={{ marginTop: 10 }} />
+            <GlassButton label={busy ? 'Saving…' : isNew ? 'Create site' : 'Save changes'} onPress={submit} loading={busy} />
+            <GlassOutlineButton label="Cancel" onPress={onClose} style={{ marginTop: 10 }} />
           </ScrollView>
         </View>
       </View>
     </Modal>
   );
 }
-
-const s = StyleSheet.create({
-  note: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'flex-start',
-    borderStyle: 'dashed',
-    marginBottom: 30,
-  },
-  noteText: { flex: 1, fontSize: 11.5, color: colors.muted, lineHeight: 17, fontFamily: fonts.body },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(28,27,24,0.6)',
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
-  sheet: { backgroundColor: colors.paper, borderRadius: radius.hero + 2, maxHeight: '85%' },
-  sheetTitle: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '700', color: colors.ink },
-  sheetSub: {
-    fontSize: 12.5,
-    color: colors.muted,
-    lineHeight: 18,
-    marginTop: 4,
-    marginBottom: spacing.lg,
-    fontFamily: fonts.body,
-  },
-});

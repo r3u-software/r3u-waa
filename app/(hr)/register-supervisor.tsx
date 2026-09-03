@@ -1,45 +1,23 @@
 /*
- * ORPHANED SCREEN — not reachable from the app's navigation.
+ * Registers a supervisor through the `waa-register-supervisor` edge function —
+ * the only supported path, since creating the Auth account needs the
+ * service-role key. Reached from Roster's "Register a supervisor" button —
+ * the header comment this file used to carry ("ORPHANED SCREEN — not
+ * reachable") predates that wiring and is stale.
  *
- * Supervisor registration. `waa-register-supervisor` itself is still deployed
- * and still works; only this mobile entry point is unwired.
- *
- * Per HR-ADMIN-MOBILE-ACCESS-ADDENDUM.md (resolved as Option A in
- * ADDENDA-PROPOSAL.md), HR/Admin's mobile surface is now exactly three
- * single-decision actions plus Notifications and Profile. This screen belongs
- * to the full HR/Admin surface, which lives on the web dashboard — so nothing
- * in the tab bar or any link points at it any more.
- *
- * It is kept, unwired, as a starting point for that separate web dashboard.
- * As written it CANNOT WORK on mobile: it queries `waa_supervisors` directly, and
- * HR/Admin's direct-table RLS grants on those were revoked. Rebuilding it for
- * the web means rewiring every query here onto purpose-built edge functions
- * first.
+ * Reskinned onto the glass system — R3U-WAA-WEB-REDESIGN.md's follow-up.
  */
 import React, { useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { registerSupervisor } from '../../src/lib/queries';
 import type { RegisterSupervisorResult } from '../../src/lib/types';
-import { ScreenBody } from '../../src/components/Screen';
-import {
-  Card,
-  ErrorNote,
-  Field,
-  PrimaryButton,
-  SecondaryButton,
-  Section,
-} from '../../src/components/ui';
 import { LockIcon } from '../../src/components/icons';
-import { colors, fonts, radius, spacing } from '../../src/theme';
+import { useWebTheme } from '../../src/web/webTheme';
+import { GlassButton, GlassCard, GlassErrorBanner, GlassField, GlassOutlineButton, GlassScreen } from '../../src/web/webUi';
 
-/**
- * Registers a supervisor through the `waa-register-supervisor` edge function —
- * the only supported path, since creating the Auth account needs the
- * service-role key. Mirrors the supervisor's own "Register worker" flow
- * exactly, including the one-time credentials modal.
- */
 export default function RegisterSupervisorScreen() {
+  const { palette } = useWebTheme();
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
@@ -75,18 +53,13 @@ export default function RegisterSupervisorScreen() {
 
   return (
     <>
-      <ScreenBody>
-        <Section title="New supervisor">
-          {error ? <ErrorNote message={error} /> : null}
-          <Card style={{ padding: spacing.xl }}>
-            <Field
-              label="Full name"
-              value={fullName}
-              onChangeText={setFullName}
-              placeholder="Ana Reyes"
-              autoCapitalize="words"
-            />
-            <Field
+      <GlassScreen>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40, maxWidth: 560, width: '100%', alignSelf: 'center' }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text, marginBottom: 10 }}>New supervisor</Text>
+          {error ? <GlassErrorBanner message={error} /> : null}
+          <GlassCard style={{ marginBottom: 16 }}>
+            <GlassField label="Full name" value={fullName} onChangeText={setFullName} placeholder="Ana Reyes" autoCapitalize="words" />
+            <GlassField
               label="Phone number"
               value={phone}
               onChangeText={setPhone}
@@ -94,65 +67,55 @@ export default function RegisterSupervisorScreen() {
               keyboardType="phone-pad"
               hint="This becomes their login identifier. Double-check it."
             />
-            <PrimaryButton
-              label={busy ? 'Registering…' : 'Register supervisor'}
-              onPress={submit}
-              loading={busy}
-            />
-          </Card>
-        </Section>
+            <GlassButton label={busy ? 'Registering…' : 'Register supervisor'} onPress={submit} loading={busy} />
+          </GlassCard>
 
-        <View style={s.note}>
-          <LockIcon size={18} color={colors.steel} />
-          <Text style={s.noteText}>
-            A temporary password is generated on the server and shown to you{' '}
-            <Text style={s.noteStrong}>once</Text>. Provisioning is top-down: you create
-            supervisors, and each supervisor registers their own workers.
-          </Text>
-        </View>
-      </ScreenBody>
+          <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: palette.panel, borderWidth: 1, borderStyle: 'dashed', borderColor: palette.border, borderRadius: 14, padding: 13 }}>
+            <LockIcon size={18} color={palette.muted} />
+            <Text style={{ flex: 1, fontSize: 11.5, color: palette.muted, lineHeight: 17 }}>
+              A temporary password is generated on the server and shown to you <Text style={{ color: palette.text, fontWeight: '700' }}>once</Text>. Provisioning is
+              top-down: you create supervisors, and each supervisor registers their own workers.
+            </Text>
+          </View>
+        </ScrollView>
+      </GlassScreen>
 
       {/* -------------------- One-time credentials modal ------------------ */}
       <Modal visible={!!credentials} transparent animationType="fade">
-        <View style={s.backdrop}>
-          <View style={s.sheet}>
-            <ScrollView contentContainerStyle={{ padding: spacing.xl }}>
-              <Text style={s.sheetTitle}>Supervisor registered</Text>
-              <Text style={s.sheetSub}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: palette.panelSolid, borderWidth: 1, borderColor: palette.border, borderRadius: 20, maxHeight: '85%' }}>
+            <ScrollView contentContainerStyle={{ padding: 20 }}>
+              <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Supervisor registered</Text>
+              <Text style={{ fontSize: 12.5, color: palette.muted, lineHeight: 18, marginTop: 4, marginBottom: 16 }}>
                 Share these credentials now. This is the only time the password is shown.
               </Text>
 
-              <View style={s.credBox}>
-                <Text style={s.credLabel}>Login (phone-based email)</Text>
-                <Text style={s.credValue} selectable>
+              <View style={{ backgroundColor: palette.hover, borderRadius: 12, padding: 14, marginBottom: 10 }}>
+                <Text style={{ fontSize: 10, letterSpacing: 1, color: palette.muted, fontWeight: '700', marginBottom: 5 }}>LOGIN (PHONE-BASED EMAIL)</Text>
+                <Text style={{ fontSize: 15, color: palette.text, fontWeight: '600' }} selectable>
                   {credentials?.login_email}
                 </Text>
               </View>
-              <View style={s.credBox}>
-                <Text style={s.credLabel}>Temporary password</Text>
-                <Text style={[s.credValue, s.credPassword]} selectable>
+              <View style={{ backgroundColor: palette.hover, borderRadius: 12, padding: 14, marginBottom: 10 }}>
+                <Text style={{ fontSize: 10, letterSpacing: 1, color: palette.muted, fontWeight: '700', marginBottom: 5 }}>TEMPORARY PASSWORD</Text>
+                <Text style={{ fontSize: 20, color: palette.accent2, fontWeight: '700', letterSpacing: 1.5 }} selectable>
                   {credentials?.temp_password}
                 </Text>
               </View>
 
-              <Text style={s.tip}>
-                They sign in on the Supervisor tab using this full address — not just the digits —
-                and this password.
+              <Text style={{ fontSize: 11.5, color: palette.muted, lineHeight: 17, marginTop: 6 }}>
+                They sign in on the Supervisor tab using this full address — not just the digits — and this password.
               </Text>
 
-              <PrimaryButton
+              <GlassButton
                 label="I've shared these credentials"
                 onPress={() => {
                   setCredentials(null);
                   router.back();
                 }}
-                style={{ marginTop: spacing.lg }}
+                style={{ marginTop: 16 }}
               />
-              <SecondaryButton
-                label="Register another supervisor"
-                onPress={() => setCredentials(null)}
-                style={{ marginTop: 10 }}
-              />
+              <GlassOutlineButton label="Register another supervisor" onPress={() => setCredentials(null)} style={{ marginTop: 10 }} />
             </ScrollView>
           </View>
         </View>
@@ -160,48 +123,3 @@ export default function RegisterSupervisorScreen() {
     </>
   );
 }
-
-const s = StyleSheet.create({
-  note: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'flex-start',
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.line,
-    borderRadius: radius.lg,
-    padding: 13,
-    marginBottom: 30,
-  },
-  noteText: { flex: 1, fontSize: 11.5, color: colors.muted, lineHeight: 17, fontFamily: fonts.body },
-  noteStrong: { color: colors.ink, fontFamily: fonts.bodyBold },
-
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(28,27,24,0.6)',
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
-  sheet: { backgroundColor: colors.paper, borderRadius: 20, maxHeight: '85%' },
-  sheetTitle: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '700', color: colors.ink },
-  sheetSub: {
-    fontSize: 12.5,
-    color: colors.muted,
-    lineHeight: 18,
-    marginTop: 4,
-    marginBottom: spacing.lg,
-    fontFamily: fonts.body,
-  },
-  credBox: { backgroundColor: colors.ink, borderRadius: radius.lg, padding: 14, marginBottom: 10 },
-  credLabel: {
-    fontSize: 10,
-    letterSpacing: 1,
-    color: colors.mutedOnDark,
-    fontFamily: fonts.bodyBold,
-    marginBottom: 5,
-  },
-  credValue: { fontSize: 15, color: '#fff', fontFamily: fonts.bodySemi },
-  credPassword: { fontSize: 20, color: colors.safety, letterSpacing: 1.5 },
-  tip: { fontSize: 11.5, color: colors.muted, lineHeight: 17, marginTop: 6, fontFamily: fonts.body },
-});
