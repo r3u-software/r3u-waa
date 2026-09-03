@@ -5,17 +5,17 @@ import { useSession, useWorker } from '../../../src/lib/session';
 import { ProfileEditor } from '../../../src/components/ProfileEditor';
 import { initialsOf } from '../../../src/lib/format';
 import { useWebTheme } from '../../../src/web/webTheme';
-import { GlassOutlineButton, GlassScreen } from '../../../src/web/webUi';
+import { ColorThemeSwitcher, GlassCard, GlassOutlineButton, GlassScreen, ModeSwitcher, WebSection } from '../../../src/web/webUi';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function WorkerProfile() {
   const worker = useWorker();
-  const { signOut, session } = useSession();
+  const { signOut } = useSession();
   const { palette } = useWebTheme();
   const insets = useSafeAreaInsets();
 
   function confirmSignOut() {
-    Alert.alert('Sign out?', 'You will need your phone number and password to get back in.', [
+    Alert.alert('Sign out?', 'You will need your User ID and password to get back in.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: signOut },
     ]);
@@ -36,11 +36,26 @@ export default function WorkerProfile() {
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>{worker.full_name}</Text>
             <Text style={{ fontSize: 13, color: palette.muted, marginTop: 2 }}>{worker.phone || 'No phone on file'}</Text>
-            <Text style={{ fontSize: 11, color: palette.muted, marginTop: 3 }}>{session?.user.email}</Text>
+            <Text style={{ fontSize: 11, color: palette.accent2, marginTop: 3, fontWeight: '700' }}>
+              User ID: {worker.login_code}
+            </Text>
           </View>
         </View>
 
         <ProfileEditor worker={worker} />
+
+        <WebSection title="Appearance">
+          <GlassCard style={{ gap: 16 }}>
+            <View>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: palette.muted, marginBottom: 8 }}>MODE</Text>
+              <ModeSwitcher />
+            </View>
+            <View>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: palette.muted, marginBottom: 8 }}>COLOR THEME</Text>
+              <ColorThemeSwitcher />
+            </View>
+          </GlassCard>
+        </WebSection>
 
         <GlassOutlineButton label="Sign out" onPress={confirmSignOut} style={{ marginBottom: 30 }} />
       </ScrollView>

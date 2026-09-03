@@ -44,6 +44,11 @@ export interface WaaSupervisor {
   /** Forced password reset — true until `waa_complete_password_reset()` runs. */
   must_change_password: boolean;
   company_id: string;
+  /** Generated at registration (e.g. `SV-521031`) — this is the "User ID"
+   * the login screen actually asks for now, not the phone number below.
+   * `phone` stays as a real contact field and a legacy sign-in fallback,
+   * never shown as "the login" anywhere in the UI any more. */
+  login_code: string;
 }
 
 /**
@@ -52,8 +57,9 @@ export interface WaaSupervisor {
  *
  * HR/Admin no longer logs in with an email address: `login_code` (e.g.
  * `HR-521031`) is its login identifier, assigned once at account creation and
- * never editable, parallel to how Worker/Supervisor use a phone number.
- * `email` is contact/profile data only — never a second way in.
+ * never editable — the same pattern `WaaWorker`/`WaaSupervisor` now use too
+ * (`WK-`/`SV-` prefixes). `email` is contact/profile data only — never a
+ * second way in.
  *
  * `full_name`/`phone`/`email` are all nullable because an HR/Admin account is
  * provisioned by the Platform Owner with nothing but a login code and a temp
@@ -107,6 +113,11 @@ export interface WaaWorker {
   /** Forced password reset — true until `waa_complete_password_reset()` runs. */
   must_change_password: boolean;
   company_id: string;
+  /** Generated at registration (e.g. `WK-521031`) — this is the "User ID"
+   * the login screen actually asks for now, not the phone number above.
+   * `phone` stays as a real contact field and a legacy sign-in fallback,
+   * never shown as "the login" anywhere in the UI any more. */
+  login_code: string;
 }
 
 export interface WaaAssignment {
@@ -316,16 +327,22 @@ export interface WaaNotification {
   created_at: string;
 }
 
-/** Response shape of the `waa-register-worker` edge function. */
+/** Response shape of the `waa-register-worker` edge function. `login_code`
+ * (e.g. `WK-521031`) is the credential to actually hand the worker now;
+ * `login_email` (the underlying phone-derived synthetic address) is still
+ * returned but no longer shown anywhere in the UI. */
 export interface RegisterWorkerResult {
   worker_id: string;
+  login_code: string;
   login_email: string;
   temp_password: string;
 }
 
-/** Response shape of the `waa-register-supervisor` edge function. */
+/** Response shape of the `waa-register-supervisor` edge function. Same
+ * `login_code` treatment as `RegisterWorkerResult`. */
 export interface RegisterSupervisorResult {
   supervisor_id: string;
+  login_code: string;
   login_email: string;
   temp_password: string;
 }

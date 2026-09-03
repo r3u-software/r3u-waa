@@ -78,7 +78,7 @@ function Splash({ subtitle }: { subtitle?: string }) {
  * owed — there is no route into a role group while either gate is open.
  */
 function RootNavigator() {
-  const { loading, session, role, roleError, mustChangePassword, hrProfileIncomplete, signOut } =
+  const { loading, session, role, roleError, mustChangePassword, hrProfileIncomplete, idleSignOut } =
     useSession();
   const segments = useSegments();
   const router = useRouter();
@@ -87,7 +87,10 @@ function RootNavigator() {
   // gets its own DOM listeners inside the hook; native activity comes from
   // the onStartShouldSetResponder on the root View below, which observes
   // every touch without capturing it away from whatever child handles it.
-  const { markActivity } = useIdleLogout(!!session, signOut);
+  // `idleSignOut`, not `signOut` — see its doc comment in session.tsx: same
+  // "back to /login" outcome, but it preserves the refresh token biometric
+  // quick-login relies on instead of revoking it on every single timeout.
+  const { markActivity } = useIdleLogout(!!session, idleSignOut);
 
   const group = segments[0];
   const inWorker = group === '(worker)';

@@ -331,6 +331,31 @@ export function MoonIcon(p: IconProps) {
   );
 }
 
+/** Biometric quick-login glyph — a fingerprint, standing in generically for
+ * "fingerprint, Face ID, or device passcode" (the actual method used is
+ * whatever the phone itself picks; the button doesn't need to guess which). */
+export function FingerprintIcon(p: IconProps) {
+  return (
+    <Svg {...base(p)}>
+      <Path d="M12 3.5c-4.7 0-8.5 3.8-8.5 8.5 0 1.7.2 3 .6 4" />
+      <Path d="M12 3.5c4.7 0 8.5 3.8 8.5 8.5 0 1-.1 2.2-.3 3" />
+      <Path d="M7.5 20.5A10 10 0 0 1 6 12c0-3.3 2.7-6 6-6s6 2.7 6 6c0 .6 0 1.2-.1 1.7" />
+      <Path d="M9.8 20.2C9 18 8.5 15.3 8.5 12a3.5 3.5 0 1 1 7 0c0 2 .3 3.9.9 5.5" />
+      <Path d="M12 12v1.5c0 2.4.5 4.7 1.4 6.8" />
+    </Svg>
+  );
+}
+
+/** "System" mode glyph — a monitor, for the light/dark/system 3-way switcher. */
+export function MonitorIcon(p: IconProps) {
+  return (
+    <Svg {...base(p)}>
+      <Rect x="2.5" y="4" width="19" height="13" rx="1.6" />
+      <Path d="M8.5 21h7M12 17v4" />
+    </Svg>
+  );
+}
+
 export function SearchIcon(p: IconProps) {
   return (
     <Svg {...base(p)}>

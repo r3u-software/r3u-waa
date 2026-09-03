@@ -31,7 +31,7 @@ export default function HrProfile() {
   const { signOut } = useSession();
 
   function confirmSignOut() {
-    Alert.alert('Sign out?', 'You will need your login ID and password to get back in.', [
+    Alert.alert('Sign out?', 'You will need your User ID and password to get back in.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: signOut },
     ]);

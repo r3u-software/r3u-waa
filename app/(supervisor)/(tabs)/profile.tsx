@@ -10,11 +10,12 @@ import { ScreenBody, TopBar } from '../../../src/components/Screen';
 import { Card, Loader, Section, SecondaryButton, StatusStrip } from '../../../src/components/ui';
 import { colors, fonts, radius, spacing, type } from '../../../src/theme';
 import { initialsOf } from '../../../src/lib/format';
+import { ColorThemeSwitcher, ModeSwitcher } from '../../../src/web/webUi';
 
 /** The supervisor's own info — read-only, plus sign-out. */
 export default function SupervisorProfile() {
   const supervisor = useSupervisor();
-  const { signOut, session } = useSession();
+  const { signOut } = useSession();
 
   const { data, loading } = useAsync(async () => {
     const [roster, projects] = await Promise.all([fetchRoster(), fetchProjects()]);
@@ -43,7 +44,7 @@ export default function SupervisorProfile() {
   const incomplete = (data?.roster ?? []).filter((w) => w.status !== 'complete').length;
 
   function confirmSignOut() {
-    Alert.alert('Sign out?', 'You will need your email and password to get back in.', [
+    Alert.alert('Sign out?', 'You will need your User ID and password to get back in.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: signOut },
     ]);
@@ -60,7 +61,7 @@ export default function SupervisorProfile() {
           <View style={{ flex: 1 }}>
             <Text style={type.greet}>{supervisor.full_name}</Text>
             <Text style={type.subgreet}>Supervisor</Text>
-            <Text style={s.email}>{session?.user.email}</Text>
+            <Text style={s.email}>User ID: {supervisor.login_code}</Text>
           </View>
         </View>
 
@@ -80,7 +81,7 @@ export default function SupervisorProfile() {
           <Card style={{ gap: 14 }}>
             <Detail label="Full name" value={supervisor.full_name} />
             <Detail label="Phone" value={supervisor.phone || 'Not set'} />
-            <Detail label="Login email" value={session?.user.email ?? '—'} />
+            <Detail label="User ID" value={supervisor.login_code} />
             <Detail
               label="Sites covered"
               value={mySites.length > 0 ? mySites.join(', ') : 'No assignments yet'}
@@ -89,6 +90,23 @@ export default function SupervisorProfile() {
           <Text style={s.note}>
             Supervisor accounts are provisioned by R3U. Contact the office to change these details.
           </Text>
+        </Section>
+
+        <Section title="Appearance">
+          <Card style={{ gap: 14 }}>
+            <View>
+              <Text style={type.label}>Mode</Text>
+              <View style={{ marginTop: 8 }}>
+                <ModeSwitcher />
+              </View>
+            </View>
+            <View>
+              <Text style={type.label}>Color theme</Text>
+              <View style={{ marginTop: 8 }}>
+                <ColorThemeSwitcher />
+              </View>
+            </View>
+          </Card>
         </Section>
 
         <Section title="Shortcuts">

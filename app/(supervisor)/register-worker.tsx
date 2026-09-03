@@ -42,7 +42,7 @@ export default function RegisterWorkerScreen() {
       return;
     }
     if (phone.replace(/\D/g, '').length < 7) {
-      setError('Enter a valid phone number — it becomes their login.');
+      setError("Enter the worker's phone number.");
       return;
     }
     if (!projectId) {
@@ -88,7 +88,7 @@ export default function RegisterWorkerScreen() {
               onChangeText={setPhone}
               placeholder="09XX XXX XXXX"
               keyboardType="phone-pad"
-              hint="This becomes the worker's login. Double-check it."
+              hint="Contact info only — their User ID is generated separately, next screen."
             />
 
             <Text style={[type.label, { marginBottom: 6 }]}>Primary site</Text>
@@ -145,9 +145,9 @@ export default function RegisterWorkerScreen() {
               </Text>
 
               <View style={s.credBox}>
-                <Text style={s.credLabel}>Login (phone-based email)</Text>
+                <Text style={s.credLabel}>User ID</Text>
                 <Text style={s.credValue} selectable>
-                  {credentials?.login_email}
+                  {credentials?.login_code}
                 </Text>
               </View>
               <View style={s.credBox}>
@@ -158,8 +158,8 @@ export default function RegisterWorkerScreen() {
               </View>
 
               <Text style={s.tip}>
-                The worker signs in on the Worker tab using their phone number and this password,
-                then completes their face scan and valid ID.
+                The worker signs in on the Worker tab using this User ID and password, then
+                completes their face scan and valid ID.
               </Text>
 
               <PrimaryButton

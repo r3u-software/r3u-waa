@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { clearBiometricSession } from './biometricAuth';
 import type { WaaHrAdmin, WaaPlatformOwner, WaaSupervisor, WaaWorker } from './types';
 
 export type Role = 'worker' | 'supervisor' | 'hr_admin' | 'platform_owner';
@@ -50,7 +51,29 @@ interface SessionState {
   companyId: string | null;
   /** Re-reads the worker/supervisor row (after a profile edit, say). */
   refreshProfile: () => Promise<void>;
+  /**
+   * Explicit, person-initiated sign-out (the "Sign out" button in Profile).
+   * Full/"global" scope — revokes the refresh token server-side — and also
+   * forgets any biometric quick-login saved on this device, matching what
+   * the confirmation dialogs already tell the person: "You will need your
+   * phone number and password to get back in."
+   */
   signOut: () => Promise<void>;
+  /**
+   * The 5-minute-idle timeout's sign-out — "both mobile and web app will
+   * logout after 5 mins no activities." Ends the on-screen session (the root
+   * guard bounces straight back to /login, same as `signOut`) but uses
+   * Supabase's "local" scope instead of the default "global" one: it clears
+   * only this client's own copy of the session and does NOT revoke the
+   * refresh token server-side. That is deliberate — it is exactly the token
+   * `saveBiometricSession` captured at last sign-in, and revoking it on
+   * every single idle timeout would silently break biometric quick-login
+   * (fingerprint/Face ID/passcode) every five minutes, defeating the reason
+   * it exists. Native only in practice (`useIdleLogout` fires on web too,
+   * where this behaves identically to `signOut` since there is no biometric
+   * record to preserve).
+   */
+  idleSignOut: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionState | undefined>(undefined);
@@ -199,8 +222,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     await resolveRole(data.session?.user.id);
   }, [resolveRole]);
 
-  const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+  const clearRoleState = useCallback(() => {
     setRole(null);
     setWorker(null);
     setSupervisor(null);
@@ -208,6 +230,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setPlatformOwner(null);
     setRoleError(null);
   }, []);
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut(); // default "global" scope: revokes server-side
+    await clearBiometricSession();
+    clearRoleState();
+  }, [clearRoleState]);
+
+  const idleSignOut = useCallback(async () => {
+    await supabase.auth.signOut({ scope: 'local' });
+    clearRoleState();
+  }, [clearRoleState]);
 
   // Derived from whichever of the three *company-scoped* rows matched —
   // `select('*')` above already brings these columns back, so there is no
@@ -234,6 +267,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       companyId,
       refreshProfile,
       signOut,
+      idleSignOut,
     }),
     [
       loading,
@@ -249,6 +283,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       companyId,
       refreshProfile,
       signOut,
+      idleSignOut,
     ]
   );
 

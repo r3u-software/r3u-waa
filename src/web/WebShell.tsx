@@ -8,15 +8,14 @@ import {
   DoorExitIcon,
   GearIcon,
   LogoutIcon,
-  MoonIcon,
   PayslipIcon,
   SearchIcon,
   SiteIcon,
-  SunIcon,
   TeamIcon,
   WalletIcon,
 } from '../components/icons';
-import { useWebTheme, webOnlyStyle, WEB_THEMES } from './webTheme';
+import { useWebTheme, webOnlyStyle } from './webTheme';
+import { ColorThemeSwitcher, ModeSwitcher } from './webUi';
 
 /**
  * The R3U Suite glass shell for HR/Admin + Platform Owner —
@@ -85,7 +84,7 @@ export function WebShell({
   children: React.ReactNode;
 }) {
   const { role, hrAdmin, platformOwner, signOut } = useSession();
-  const { palette, themeId, mode, themes, setThemeId, setMode } = useWebTheme();
+  const { palette, themeId, themes, setThemeId } = useWebTheme();
 
   const isPlatformOwner = role === 'platform_owner';
   const groups = isPlatformOwner ? PLATFORM_OWNER_NAV : HR_NAV;
@@ -206,15 +205,9 @@ export function WebShell({
               <Text style={[s.searchText, { color: palette.muted }]}>Search workers, runs, sites…</Text>
             </View>
 
-            <ThemeSwitcher />
+            <ColorThemeSwitcher compact />
 
-            <Pressable
-              onPress={() => setMode(mode === 'dark' ? 'light' : 'dark')}
-              accessibilityLabel={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              style={[s.modeBtn, { backgroundColor: palette.panelSolid, borderColor: palette.border }]}
-            >
-              {mode === 'dark' ? <MoonIcon color={palette.muted} size={15} /> : <SunIcon color={palette.muted} size={15} />}
-            </Pressable>
+            <ModeSwitcher compact />
 
             {actions}
           </View>
@@ -224,29 +217,6 @@ export function WebShell({
           </ScrollView>
         </View>
       </View>
-    </View>
-  );
-}
-
-function ThemeSwitcher() {
-  const { themeId, setThemeId } = useWebTheme();
-  return (
-    <View style={s.swatchRow}>
-      {WEB_THEMES.map((t) => {
-        const on = t.id === themeId;
-        return (
-          <Pressable
-            key={t.id}
-            onPress={() => setThemeId(t.id)}
-            accessibilityLabel={t.label}
-            style={[
-              s.swatch,
-              webOnlyStyle({ backgroundImage: `linear-gradient(135deg, ${t.accent}, ${t.accent2})` }),
-              on ? { borderColor: 'currentColor', borderWidth: 2 } : null,
-            ]}
-          />
-        );
-      })}
     </View>
   );
 }
@@ -290,10 +260,6 @@ const s = StyleSheet.create({
   topSub: { fontSize: 12, marginTop: 1 },
   search: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 11, paddingHorizontal: 13, paddingVertical: 8, minWidth: 200 },
   searchText: { fontSize: 12.5 },
-  swatchRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  swatch: { width: 18, height: 18, borderRadius: 9 },
-  modeBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-
   content: { paddingBottom: 40 },
   contentInner: { padding: 24, width: '100%', maxWidth: 1180, alignSelf: 'center' },
 });

@@ -30,7 +30,7 @@ export default function RegisterSupervisorScreen() {
       return;
     }
     if (phone.replace(/\D/g, '').length < 7) {
-      setError('Enter a valid phone number — it becomes their login.');
+      setError("Enter the supervisor's phone number.");
       return;
     }
 
@@ -65,7 +65,7 @@ export default function RegisterSupervisorScreen() {
               onChangeText={setPhone}
               placeholder="09XX XXX XXXX"
               keyboardType="phone-pad"
-              hint="This becomes their login identifier. Double-check it."
+              hint="Contact info only — their User ID is generated separately, next screen."
             />
             <GlassButton label={busy ? 'Registering…' : 'Register supervisor'} onPress={submit} loading={busy} />
           </GlassCard>
@@ -91,9 +91,9 @@ export default function RegisterSupervisorScreen() {
               </Text>
 
               <View style={{ backgroundColor: palette.hover, borderRadius: 12, padding: 14, marginBottom: 10 }}>
-                <Text style={{ fontSize: 10, letterSpacing: 1, color: palette.muted, fontWeight: '700', marginBottom: 5 }}>LOGIN (PHONE-BASED EMAIL)</Text>
+                <Text style={{ fontSize: 10, letterSpacing: 1, color: palette.muted, fontWeight: '700', marginBottom: 5 }}>USER ID</Text>
                 <Text style={{ fontSize: 15, color: palette.text, fontWeight: '600' }} selectable>
-                  {credentials?.login_email}
+                  {credentials?.login_code}
                 </Text>
               </View>
               <View style={{ backgroundColor: palette.hover, borderRadius: 12, padding: 14, marginBottom: 10 }}>
@@ -104,7 +104,7 @@ export default function RegisterSupervisorScreen() {
               </View>
 
               <Text style={{ fontSize: 11.5, color: palette.muted, lineHeight: 17, marginTop: 6 }}>
-                They sign in on the Supervisor tab using this full address — not just the digits — and this password.
+                They sign in on the Supervisor tab using this User ID and password.
               </Text>
 
               <GlassButton

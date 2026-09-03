@@ -1,6 +1,6 @@
 import React from 'react';
 import { Stack } from 'expo-router';
-import { resolvePalette, WebThemeProvider } from '../../src/web/webTheme';
+import { useWebTheme, WebThemeProvider } from '../../src/web/webTheme';
 
 /**
  * Supervisor flow: the tab shell plus pushed detail/registration screens.
@@ -9,33 +9,46 @@ import { resolvePalette, WebThemeProvider } from '../../src/web/webTheme';
  * and `(hr)`'s) for the same reason `(worker)/_layout.tsx` needed it: the
  * shared `TabBar` component now reads `useWebTheme()` unconditionally, so
  * every route group that renders it must provide the context or it throws.
- * The Stack header/canvas are reskinned to match; Supervisor's own screen
- * *content* (`(tabs)/*`, `worker/[id]`, `register-worker`) is not part of
- * this pass and still renders in the original paper theme underneath —
- * called out explicitly, not a silent gap.
+ * Supervisor's own screen *content* (`(tabs)/roster`, `(tabs)/team`,
+ * `worker/[id]`, `register-worker`) is still not part of the glass reskin and
+ * renders in the original paper theme underneath — called out explicitly,
+ * not a silent gap. `(tabs)/profile` is the one exception: it got an
+ * "Appearance" section wired to this same context so Supervisor can actually
+ * reach the theme/mode picker, same as Worker can.
+ *
+ * `SupervisorStack` is split out so it can call `useWebTheme()` itself — only
+ * valid *inside* `WebThemeProvider`, so it can't happen in the component that
+ * renders the provider. Palette used to be a frozen
+ * `resolvePalette('aurora','dark')` constant; now it reacts live to whatever
+ * was actually picked.
  */
-const P = resolvePalette('aurora', 'dark');
-
 export default function SupervisorLayout() {
   return (
     <WebThemeProvider>
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: P.panelSolid },
-          headerTitleStyle: { fontWeight: '700', fontSize: 16, color: P.text },
-          headerTintColor: P.text,
-          headerShadowVisible: false,
-          contentStyle: { backgroundColor: P.bg },
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
-        <Stack.Screen
-          name="register-worker"
-          options={{ title: 'Register worker', presentation: 'modal' }}
-        />
-        <Stack.Screen name="worker/[id]" options={{ title: 'Worker' }} />
-      </Stack>
+      <SupervisorStack />
     </WebThemeProvider>
+  );
+}
+
+function SupervisorStack() {
+  const { palette: P } = useWebTheme();
+  return (
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: P.panelSolid },
+        headerTitleStyle: { fontWeight: '700', fontSize: 16, color: P.text },
+        headerTintColor: P.text,
+        headerShadowVisible: false,
+        contentStyle: { backgroundColor: P.bg },
+      }}
+    >
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
+      <Stack.Screen
+        name="register-worker"
+        options={{ title: 'Register worker', presentation: 'modal' }}
+      />
+      <Stack.Screen name="worker/[id]" options={{ title: 'Worker' }} />
+    </Stack>
   );
 }

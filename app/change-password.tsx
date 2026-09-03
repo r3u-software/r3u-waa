@@ -89,7 +89,7 @@ export default function ChangePasswordScreen() {
   return (
     <WebThemeProvider>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView keyboardShouldPersistTaps="handled">
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }}>
           <AuthShell
             eyebrow="R3U SITE SUITE"
             title="Set a new password"

@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Line, LinearGradient, Polygon, Polyline, Stop } from 'react-native-svg';
 import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { useWebTheme, webOnlyStyle, WebPalette } from './webTheme';
+import { useWebTheme, webOnlyStyle, WEB_THEMES, WebModePref, WebPalette } from './webTheme';
+import { MonitorIcon, MoonIcon, SunIcon } from '../components/icons';
 
 /**
  * Presentational primitives for the HR/Admin + Platform Owner web dashboard —
@@ -487,6 +488,97 @@ export function AuthShell({
 
         <View style={[s2.authCard, { borderColor: palette.border, backgroundColor: palette.panel }]}>{children}</View>
       </View>
+    </View>
+  );
+}
+
+/** Light / Dark / System, one pill with three segments — the platform-wide
+ * appearance control BRAND-SYSTEM.md's Global experience list calls for.
+ * `compact` (icons only, no label) is what fits the web dashboard's top bar;
+ * the full labeled form is what the native Worker/Supervisor Profile screens
+ * use in their "Appearance" section, since there's no top bar there to put
+ * it in. Either way it edits the same `modePref` in `useWebTheme()`, so a
+ * choice made on one surface is the choice read back on every other. */
+export function ModeSwitcher({ compact = false }: { compact?: boolean }) {
+  const { modePref, setModePref, palette } = useWebTheme();
+  const options: { id: WebModePref; label: string; Icon: typeof SunIcon }[] = [
+    { id: 'light', label: 'Light', Icon: SunIcon },
+    { id: 'dark', label: 'Dark', Icon: MoonIcon },
+    { id: 'system', label: 'System', Icon: MonitorIcon },
+  ];
+  return (
+    <View style={{ flexDirection: 'row', backgroundColor: palette.hover, borderRadius: 999, padding: 3, gap: 2 }}>
+      {options.map(({ id, label, Icon }) => {
+        const active = modePref === id;
+        return (
+          <Pressable
+            key={id}
+            onPress={() => setModePref(id)}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            accessibilityState={{ selected: active }}
+            style={({ pressed }) => [
+              {
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: compact ? 9 : 13,
+                paddingVertical: compact ? 6 : 8,
+                borderRadius: 999,
+                backgroundColor: active ? palette.panelSolid : 'transparent',
+              },
+              pressed && !active && { opacity: 0.6 },
+            ]}
+          >
+            <Icon color={active ? palette.text : palette.muted} size={compact ? 13 : 14} />
+            {!compact ? (
+              <Text style={{ fontSize: 12, fontWeight: '600', color: active ? palette.text : palette.muted }}>
+                {label}
+              </Text>
+            ) : null}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** The ten BRAND-SYSTEM.md accent themes as tappable swatches. Real
+ * `ExpoLinearGradient` per swatch rather than the `webOnlyStyle`
+ * CSS-`backgroundImage` trick WebShell's original inline version used — that
+ * renders nothing on native (`webOnlyStyle` returns `{}` off web), and this
+ * is now shared with the native Worker/Supervisor Profile screens' own
+ * Appearance section, so the swatches have to actually paint there too. */
+export function ColorThemeSwitcher({ compact = false }: { compact?: boolean }) {
+  const { themeId, setThemeId, palette } = useWebTheme();
+  const size = compact ? 18 : 28;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: compact ? 'nowrap' : 'wrap', gap: compact ? 7 : 11, alignItems: 'center' }}>
+      {WEB_THEMES.map((t) => {
+        const on = t.id === themeId;
+        return (
+          <Pressable
+            key={t.id}
+            onPress={() => setThemeId(t.id)}
+            accessibilityRole="button"
+            accessibilityLabel={t.label}
+            accessibilityState={{ selected: on }}
+          >
+            <ExpoLinearGradient
+              colors={[t.accent, t.accent2]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                width: size,
+                height: size,
+                borderRadius: size / 2,
+                borderWidth: on ? 2.5 : 0,
+                borderColor: palette.text,
+              }}
+            />
+          </Pressable>
+        );
+      })}
     </View>
   );
 }

@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
-import { Platform } from 'react-native';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import { Platform, useColorScheme } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * Web-only theme engine for the HR/Admin + Platform Owner dashboards —
@@ -37,7 +38,16 @@ export const WEB_THEMES: WebThemeDef[] = [
 
 const DEFAULT_THEME_ID = 'aurora';
 
+/** The resolved paint mode — always one of these two, never `'system'`. */
 export type WebMode = 'light' | 'dark';
+
+/**
+ * What the user actually picked. `'system'` means "follow the device/OS
+ * setting" — BRAND-SYSTEM.md's Global experience list calls for "Dark/Light
+ * Mode" as a platform-wide, user-switchable preference, and "follows the
+ * phone" is the default every user expects until they override it.
+ */
+export type WebModePref = 'light' | 'dark' | 'system';
 
 /** Everything a component needs to paint itself; never a raw hex literal. */
 export interface WebPalette {
@@ -101,72 +111,113 @@ export function webOnlyStyle(style: Record<string, unknown>): object {
 
 /* ------------------------------------------------------------- Context --- */
 
+/**
+ * `AsyncStorage` rather than `window.localStorage` directly: it already ships
+ * as the Supabase session's own storage adapter (`src/lib/supabase.ts`) and
+ * resolves on every platform this app runs on — a plain object store backed
+ * by `localStorage` on web, and the native SQLite-backed store on iOS/
+ * Android. That is what actually lets a theme choice survive on the phone,
+ * not just the browser: before this, `loadStored`/`persist` only ever wrote
+ * anything on `Platform.OS === 'web'`, so Worker/Supervisor's native theme
+ * was silently unpersistable even once a picker existed for it.
+ */
 const STORAGE_KEY = 'r3u-waa-web-theme';
 
-function loadStored(): { themeId: string; mode: WebMode } {
-  if (Platform.OS !== 'web' || typeof window === 'undefined') {
-    return { themeId: DEFAULT_THEME_ID, mode: 'dark' };
-  }
+interface StoredPrefs {
+  themeId: string;
+  modePref: WebModePref;
+}
+
+const DEFAULT_PREFS: StoredPrefs = { themeId: DEFAULT_THEME_ID, modePref: 'system' };
+
+async function loadStored(): Promise<StoredPrefs> {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { themeId: DEFAULT_THEME_ID, mode: 'dark' };
+    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULT_PREFS;
     const parsed = JSON.parse(raw);
-    return {
-      themeId: typeof parsed.themeId === 'string' ? parsed.themeId : DEFAULT_THEME_ID,
-      mode: parsed.mode === 'light' ? 'light' : 'dark',
-    };
+    const themeId = typeof parsed.themeId === 'string' ? parsed.themeId : DEFAULT_THEME_ID;
+    // Back-compat: the pre-system-mode shape only ever stored `mode:
+    // 'light'|'dark'` (web only). Treat that as the equivalent explicit pick
+    // rather than resetting everyone quietly to 'system' on upgrade.
+    const modePref: WebModePref =
+      parsed.modePref === 'light' || parsed.modePref === 'dark' || parsed.modePref === 'system'
+        ? parsed.modePref
+        : parsed.mode === 'light' || parsed.mode === 'dark'
+        ? parsed.mode
+        : 'system';
+    return { themeId, modePref };
   } catch {
-    return { themeId: DEFAULT_THEME_ID, mode: 'dark' };
+    return DEFAULT_PREFS;
   }
 }
 
 interface WebThemeState {
   themeId: string;
+  /** Resolved paint mode — 'system' already collapsed to light/dark. */
   mode: WebMode;
+  /** What the user actually picked, including 'system'. Drives the 3-way UI. */
+  modePref: WebModePref;
   palette: WebPalette;
   themes: WebThemeDef[];
   setThemeId: (id: string) => void;
-  setMode: (m: WebMode) => void;
+  setModePref: (m: WebModePref) => void;
 }
 
 const WebThemeCtx = createContext<WebThemeState | null>(null);
 
 export function WebThemeProvider({ children }: { children: React.ReactNode }) {
-  const initial = useMemo(loadStored, []);
-  const [themeId, setThemeIdState] = useState(initial.themeId);
-  const [mode, setModeState] = useState<WebMode>(initial.mode);
+  // `useColorScheme` is the RN-standard live OS-appearance hook — it works on
+  // web too (backed by `prefers-color-scheme`), so 'system' tracks the same
+  // way on every platform without a Platform.OS branch.
+  const systemScheme = useColorScheme();
+  const [themeId, setThemeIdState] = useState(DEFAULT_THEME_ID);
+  const [modePref, setModePrefState] = useState<WebModePref>('system');
 
-  const persist = useCallback((next: { themeId: string; mode: WebMode }) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // Private-browsing or storage-full — the switcher still works for
-        // this session, it just won't be remembered next visit.
-      }
-    }
+  // AsyncStorage is inherently async (even its web shim), so the stored pick
+  // arrives one tick after first paint — same brief default-then-settle
+  // already accepted elsewhere in this app (e.g. the splash/loading screens)
+  // rather than blocking first render on it.
+  useEffect(() => {
+    let active = true;
+    loadStored().then((prefs) => {
+      if (!active) return;
+      setThemeIdState(prefs.themeId);
+      setModePrefState(prefs.modePref);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const persist = useCallback((next: StoredPrefs) => {
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {
+      // Private-browsing, storage-full, or no-op native backends — the
+      // switcher still works for this session, it just won't be remembered.
+    });
   }, []);
 
   const setThemeId = useCallback(
     (id: string) => {
       setThemeIdState(id);
-      persist({ themeId: id, mode });
+      persist({ themeId: id, modePref });
     },
-    [mode, persist]
+    [modePref, persist]
   );
-  const setMode = useCallback(
-    (m: WebMode) => {
-      setModeState(m);
-      persist({ themeId, mode: m });
+  const setModePref = useCallback(
+    (m: WebModePref) => {
+      setModePrefState(m);
+      persist({ themeId, modePref: m });
     },
     [themeId, persist]
   );
 
+  const mode: WebMode = modePref === 'system' ? (systemScheme === 'light' ? 'light' : 'dark') : modePref;
+
   const palette = useMemo(() => resolvePalette(themeId, mode), [themeId, mode]);
 
   const value = useMemo(
-    () => ({ themeId, mode, palette, themes: WEB_THEMES, setThemeId, setMode }),
-    [themeId, mode, palette, setThemeId, setMode]
+    () => ({ themeId, mode, modePref, palette, themes: WEB_THEMES, setThemeId, setModePref }),
+    [themeId, mode, modePref, palette, setThemeId, setModePref]
   );
 
   return <WebThemeCtx.Provider value={value}>{children}</WebThemeCtx.Provider>;
