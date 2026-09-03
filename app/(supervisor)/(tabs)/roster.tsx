@@ -1,26 +1,28 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSupervisor } from '../../../src/lib/session';
 import { useAsync } from '../../../src/lib/useAsync';
 import { fetchProjects, fetchRoster, fetchTodaysEntries } from '../../../src/lib/queries';
 import { supabase } from '../../../src/lib/supabase';
 import type { WaaAssignmentWithProject } from '../../../src/lib/types';
-import { ScreenBody, TopBar } from '../../../src/components/Screen';
+import { EmptyState } from '../../../src/components/ui';
+import { useWebTheme } from '../../../src/web/webTheme';
 import {
-  Card,
-  EmptyState,
-  Loader,
-  Pill,
-  PrimaryButton,
-  Section,
-} from '../../../src/components/ui';
-import { colors, fonts, radius, type } from '../../../src/theme';
-import { initialsOf } from '../../../src/lib/format';
+  Chip,
+  DataRow,
+  DataTable,
+  GlassButton,
+  GlassPullScreen,
+  WebPill,
+  WebSection,
+  WorkerCell,
+} from '../../../src/web/webUi';
 
 /** Full team roster, filterable by site, and the entry point for registration. */
 export default function RosterScreen() {
   const supervisor = useSupervisor();
+  const { palette } = useWebTheme();
   const [siteFilter, setSiteFilter] = useState<string | null>(null);
 
   const { data, loading, reload } = useAsync(async () => {
@@ -70,136 +72,78 @@ export default function RosterScreen() {
     );
   }, [data?.roster, siteFilter, sitesByWorker]);
 
+  const cols = [
+    { key: 'worker', label: 'Worker', flex: 2 },
+    { key: 'site', label: 'Site', flex: 1 },
+    { key: 'status', label: 'Status', flex: 1, align: 'right' as const },
+  ];
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.paper }}>
-      <TopBar label="Roster" />
-      <ScreenBody refreshing={loading} onRefresh={reload}>
-        <Text style={type.greet}>Your team</Text>
-        <Text style={[type.subgreet, { marginBottom: 16 }]}>
-          {data?.roster.length ?? 0} worker{(data?.roster.length ?? 0) === 1 ? '' : 's'} registered
-        </Text>
+    <GlassPullScreen loading={loading} onRefresh={reload}>
+      <Text style={{ fontSize: 22, fontWeight: '700', color: palette.text }}>Your team</Text>
+      <Text style={{ fontSize: 13, color: palette.muted, marginTop: 2, marginBottom: 16 }}>
+        {data?.roster.length ?? 0} worker{(data?.roster.length ?? 0) === 1 ? '' : 's'} registered
+      </Text>
 
-        <PrimaryButton
-          label="Register a worker"
-          onPress={() => router.push('/(supervisor)/register-worker')}
-          style={{ marginBottom: 20 }}
-        />
+      <GlassButton
+        label="Register a worker"
+        onPress={() => router.push('/(supervisor)/register-worker')}
+        style={{ marginBottom: 18 }}
+      />
 
-        {/* --------------------------- Site filter ------------------------ */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.filterRow}
-        >
-          <Pressable
-            onPress={() => setSiteFilter(null)}
-            style={[s.filterChip, siteFilter === null && s.filterChipActive]}
-          >
-            <Text style={[s.filterText, siteFilter === null && s.filterTextActive]}>All sites</Text>
-          </Pressable>
-          {(data?.projects ?? []).map((p) => (
-            <Pressable
-              key={p.id}
-              onPress={() => setSiteFilter(p.id)}
-              style={[s.filterChip, siteFilter === p.id && s.filterChipActive]}
-            >
-              <Text style={[s.filterText, siteFilter === p.id && s.filterTextActive]}>{p.name}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+      {/* --------------------------- Site filter ------------------------ */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 18 }}>
+        <Chip label="All sites" active={siteFilter === null} onPress={() => setSiteFilter(null)} />
+        {(data?.projects ?? []).map((p) => (
+          <Chip key={p.id} label={p.name} active={siteFilter === p.id} onPress={() => setSiteFilter(p.id)} />
+        ))}
+      </ScrollView>
 
-        <Section title={siteFilter ? 'Workers at this site' : 'All workers'}>
-          {loading && !data ? (
-            <Loader />
-          ) : filtered.length === 0 ? (
-            <EmptyState
-              title={siteFilter ? 'Nobody assigned here' : 'No workers yet'}
-              body={
-                siteFilter
-                  ? 'No worker under you is assigned to this site.'
-                  : 'Register your first worker to issue their login credentials.'
-              }
-            />
-          ) : (
-            <Card>
-              {filtered.map((w, i) => {
-                const live = liveStatus.get(w.id);
-                const label =
-                  w.status !== 'complete'
-                    ? 'Incomplete'
-                    : live === 'in'
-                      ? 'In'
-                      : live === 'out'
-                        ? 'Out'
-                        : 'Off';
-                const tone = w.status !== 'complete' ? 'warn' : live === 'in' ? 'ok' : 'muted';
-                const sites = sitesByWorker.get(w.id) ?? [];
-                const primary = sites.find((a) => a.is_primary) ?? sites[0];
-                return (
-                  <Pressable
-                    key={w.id}
-                    onPress={() => router.push(`/(supervisor)/worker/${w.id}`)}
-                    style={({ pressed }) => [
-                      s.row,
-                      i === filtered.length - 1 && s.rowLast,
-                      pressed && { opacity: 0.7 },
-                    ]}
-                  >
-                    <View style={s.avatar}>
-                      <Text style={s.initials}>{initialsOf(w.full_name)}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.name}>{w.full_name}</Text>
-                      <Text style={s.sub}>
-                        {primary?.project?.name ?? 'No site'}
-                        {sites.length > 1 ? ` +${sites.length - 1}` : ''} · {w.phone || 'no phone'}
-                      </Text>
-                    </View>
-                    <Pill label={label} tone={tone} />
-                  </Pressable>
-                );
-              })}
-            </Card>
-          )}
-        </Section>
-      </ScreenBody>
-    </View>
+      <WebSection title={siteFilter ? 'Workers at this site' : 'All workers'}>
+        {loading && !data ? (
+          <Text style={{ color: palette.muted, textAlign: 'center', paddingVertical: 16 }}>Loading…</Text>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            title={siteFilter ? 'Nobody assigned here' : 'No workers yet'}
+            body={
+              siteFilter
+                ? 'No worker under you is assigned to this site.'
+                : 'Register your first worker to issue their login credentials.'
+            }
+          />
+        ) : (
+          <DataTable columns={cols}>
+            {filtered.map((w, i) => {
+              const live = liveStatus.get(w.id);
+              const label =
+                w.status !== 'complete' ? 'Incomplete' : live === 'in' ? 'In' : live === 'out' ? 'Out' : 'Off';
+              const tone = w.status !== 'complete' ? 'bad' : live === 'in' ? 'good' : 'muted';
+              const sites = sitesByWorker.get(w.id) ?? [];
+              const primary = sites.find((a) => a.is_primary) ?? sites[0];
+              return (
+                <DataRow
+                  key={w.id}
+                  index={i}
+                  columns={cols}
+                  onPress={() => router.push(`/(supervisor)/worker/${w.id}`)}
+                  values={{
+                    worker: <WorkerCell name={w.full_name} sub={w.phone || 'No phone on file'} />,
+                    site: (
+                      <View>
+                        <Text style={{ fontSize: 12.5, color: palette.text }}>{primary?.project?.name ?? 'No site'}</Text>
+                        {sites.length > 1 ? (
+                          <Text style={{ fontSize: 10.5, color: palette.muted }}>+{sites.length - 1} more</Text>
+                        ) : null}
+                      </View>
+                    ),
+                    status: <WebPill label={label} tone={tone} />,
+                  }}
+                />
+              );
+            })}
+          </DataTable>
+        )}
+      </WebSection>
+    </GlassPullScreen>
   );
 }
-
-const s = StyleSheet.create({
-  filterRow: { gap: 8, paddingBottom: 18, paddingRight: 8 },
-  filterChip: {
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.line,
-  },
-  filterChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  filterText: { fontSize: 12, fontFamily: fonts.bodySemi, color: colors.muted },
-  filterTextActive: { color: colors.paper },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-  },
-  rowLast: { borderBottomWidth: 0 },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
-    backgroundColor: colors.paper,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initials: { fontSize: 12, fontFamily: fonts.bodyBold, color: colors.steel },
-  name: { fontSize: 13, fontFamily: fonts.bodyBold, color: colors.ink },
-  sub: { fontSize: 11, color: colors.muted, fontFamily: fonts.body },
-});

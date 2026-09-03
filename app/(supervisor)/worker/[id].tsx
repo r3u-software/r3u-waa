@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSupervisor } from '../../../src/lib/session';
 import { useAsync } from '../../../src/lib/useAsync';
 import {
@@ -15,22 +16,23 @@ import {
 import type { EmploymentStatus } from '../../../src/lib/types';
 import { pickPdf } from '../../../src/lib/capture';
 import { uploadToBucket } from '../../../src/lib/storage';
-import { ScreenBody } from '../../../src/components/Screen';
-import {
-  Card,
-  EmptyState,
-  ListCard,
-  Loader,
-  Pill,
-  PrimaryButton,
-  SecondaryButton,
-  Section,
-  StatusStrip,
-} from '../../../src/components/ui';
+import { EmptyState } from '../../../src/components/ui';
 import { SignedImage } from '../../../src/components/SignedImage';
 import { CalendarIcon, CashIcon, FileIcon, SiteGlyph } from '../../../src/components/icons';
-import { colors, fonts, radius, spacing, toneForStatus, type } from '../../../src/theme';
+import { toneForStatus } from '../../../src/theme';
 import { coords, dateRange, initialsOf, relativeStamp } from '../../../src/lib/format';
+import { useWebTheme } from '../../../src/web/webTheme';
+import {
+  GlassButton,
+  GlassCard,
+  GlassListRow,
+  GlassOutlineButton,
+  GlassScreen,
+  MetricCard,
+  WebPill,
+  WebSection,
+  webToneFor,
+} from '../../../src/web/webUi';
 
 /** The three separation reasons the supervisor may tag. */
 const SEPARATION_OPTIONS: { value: EmploymentStatus; label: string }[] = [
@@ -46,6 +48,7 @@ const SEPARATION_OPTIONS: { value: EmploymentStatus; label: string }[] = [
 export default function WorkerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const supervisor = useSupervisor();
+  const { palette } = useWebTheme();
   const [uploading, setUploading] = useState(false);
   const [tagging, setTagging] = useState(false);
 
@@ -129,20 +132,24 @@ export default function WorkerDetailScreen() {
 
   if (loading && !data) {
     return (
-      <ScreenBody>
-        <Loader label="Loading worker" />
-      </ScreenBody>
+      <GlassScreen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: palette.muted }}>Loading worker…</Text>
+        </View>
+      </GlassScreen>
     );
   }
 
   if (!worker) {
     return (
-      <ScreenBody>
-        <EmptyState
-          title="Worker not found"
-          body="This worker may have been removed, or is not assigned to you."
-        />
-      </ScreenBody>
+      <GlassScreen>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+          <EmptyState
+            title="Worker not found"
+            body="This worker may have been removed, or is not assigned to you."
+          />
+        </ScrollView>
+      </GlassScreen>
     );
   }
 
@@ -152,100 +159,101 @@ export default function WorkerDetailScreen() {
   const declined = entries.filter((e) => e.status === 'declined').length;
 
   return (
-    <>
+    <GlassScreen>
       <Stack.Screen options={{ title: worker.full_name }} />
-      <ScreenBody refreshing={loading} onRefresh={reload}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         {/* ------------------------------- Header ----------------------- */}
-        <View style={s.hero}>
-          <View style={s.avatar}>
-            <Text style={s.avatarText}>{initialsOf(worker.full_name)}</Text>
-          </View>
+        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center', marginBottom: 20 }}>
+          <LinearGradient
+            colors={[palette.accent, palette.accent2]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ width: 58, height: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 19 }}>{initialsOf(worker.full_name)}</Text>
+          </LinearGradient>
           <View style={{ flex: 1, gap: 3 }}>
-            <Text style={type.greet}>{worker.full_name}</Text>
-            <Text style={type.subgreet}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>{worker.full_name}</Text>
+            <Text style={{ fontSize: 13, color: palette.muted }}>
               {worker.position ? `${worker.position} · ` : ''}
               {worker.phone || 'No phone on file'}
             </Text>
-            <View style={s.pillRow}>
-              <Pill label={worker.status} tone={toneForStatus(worker.status)} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+              <WebPill label={worker.status} tone={webToneFor(toneForStatus(worker.status))} />
               {worker.employment_status !== 'active' ? (
-                <Pill
-                  label={worker.employment_status}
-                  tone={toneForStatus(worker.employment_status)}
-                />
+                <WebPill label={worker.employment_status} tone={webToneFor(toneForStatus(worker.employment_status))} />
               ) : null}
             </View>
           </View>
         </View>
 
-        <StatusStrip
-          chips={[
-            { value: approved, label: 'Approved punches', tone: 'ok' },
-            { value: pending, label: 'Awaiting review', tone: 'pending' },
-            { value: declined, label: 'Declined', tone: 'warn' },
-          ]}
-        />
+        <View style={{ flexDirection: 'row', gap: 9, marginBottom: 16 }}>
+          <MetricCard style={{ flex: 1, padding: 12 }} label="Approved punches" value={String(approved)} trendPct={null} />
+          <MetricCard style={{ flex: 1, padding: 12 }} label="Awaiting review" value={String(pending)} trendPct={null} />
+          <MetricCard style={{ flex: 1, padding: 12 }} label="Declined" value={String(declined)} trendPct={null} />
+        </View>
 
         {/* ------------------------------ Evidence ---------------------- */}
-        <Section title="Identity on file">
-          <Card>
-            <View style={s.evidenceRow}>
-              <View style={s.evidenceItem}>
+        <WebSection title="Identity on file">
+          <GlassCard>
+            <View style={{ flexDirection: 'row', gap: 20 }}>
+              <View style={{ alignItems: 'center', gap: 7 }}>
                 <SignedImage bucket="waa-selfies" path={worker.face_scan_url} size={84} radius={12} />
-                <Text style={s.evidenceLabel}>
+                <Text style={{ fontSize: 11, color: palette.muted, fontWeight: '600' }}>
                   {worker.face_scan_url ? 'Face scan' : 'No face scan'}
                 </Text>
               </View>
-              <View style={s.evidenceItem}>
+              <View style={{ alignItems: 'center', gap: 7 }}>
                 <SignedImage bucket="waa-ids" path={worker.valid_id_url} size={84} radius={12} />
-                <Text style={s.evidenceLabel}>{worker.valid_id_url ? 'Valid ID' : 'No valid ID'}</Text>
+                <Text style={{ fontSize: 11, color: palette.muted, fontWeight: '600' }}>
+                  {worker.valid_id_url ? 'Valid ID' : 'No valid ID'}
+                </Text>
               </View>
             </View>
             {worker.status !== 'complete' ? (
-              <Text style={s.incompleteNote}>
+              <Text style={{ fontSize: 11.5, color: palette.bad, lineHeight: 17, marginTop: 12 }}>
                 This worker still needs to complete their profile before their identity can be
                 verified.
               </Text>
             ) : null}
-          </Card>
-        </Section>
+          </GlassCard>
+        </WebSection>
 
         {/* ------------------------------- Sites ------------------------ */}
-        <Section title="Site assignments">
+        <WebSection title="Site assignments">
           {(data?.assignments.length ?? 0) === 0 ? (
             <EmptyState title="No site assignments" />
           ) : (
             data!.assignments.map((a) => (
-              <ListCard
+              <GlassListRow
                 key={a.id}
-                iconBg={colors.neutralBg}
-                icon={<SiteGlyph size={17} color={colors.steel} />}
+                icon={<SiteGlyph size={17} color={palette.text} />}
                 title={a.project?.name ?? 'Site'}
                 subtitle={a.project?.location ?? undefined}
-                tone={a.is_primary ? 'muted' : 'pending'}
+                tone={a.is_primary ? 'muted' : 'info'}
                 pillLabel={a.is_primary ? 'Primary' : 'Borrowed'}
               />
             ))
           )}
-        </Section>
+        </WebSection>
 
         {/* ------------------------------ Contract ---------------------- */}
-        <Section title="Contract">
-          <Card>
-            <View style={s.contractRow}>
-              <View style={s.contractIcon}>
-                <FileIcon size={20} color={worker.contract_pdf_url ? colors.steel : colors.muted} />
+        <WebSection title="Contract">
+          <GlassCard>
+            <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: palette.hover, alignItems: 'center', justifyContent: 'center' }}>
+                <FileIcon size={20} color={worker.contract_pdf_url ? palette.accent2 : palette.muted} />
               </View>
               <View style={{ flex: 1, gap: 2 }}>
-                <Text style={type.cardTitle}>
+                <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>
                   {worker.contract_pdf_url ? 'Signed contract on file' : 'No contract uploaded'}
                 </Text>
-                <Text style={type.cardSub}>
+                <Text style={{ fontSize: 12, color: palette.muted }}>
                   The worker can read this from their profile but cannot edit or replace it.
                 </Text>
               </View>
             </View>
-            <PrimaryButton
+            <GlassButton
               label={
                 uploading
                   ? 'Uploading…'
@@ -255,94 +263,73 @@ export default function WorkerDetailScreen() {
               }
               onPress={uploadContract}
               loading={uploading}
-              tone={worker.contract_pdf_url ? 'ink' : 'safety'}
               style={{ marginTop: 12 }}
             />
-          </Card>
-        </Section>
+          </GlassCard>
+        </WebSection>
 
         {/* ----------------------------- Punch log ---------------------- */}
-        <Section title="Time entries">
+        <WebSection title="Time entries">
           {entries.length === 0 ? (
             <EmptyState title="No punches yet" />
           ) : (
             entries.slice(0, 15).map((e) => (
-              <ListCard
+              <GlassListRow
                 key={e.id}
-                iconBg={
-                  e.status === 'approved'
-                    ? colors.okBg
-                    : e.status === 'pending'
-                      ? colors.pendingBg
-                      : colors.warnBg
-                }
-                icon={
-                  <SiteGlyph
-                    size={17}
-                    color={
-                      e.status === 'approved'
-                        ? colors.ok
-                        : e.status === 'pending'
-                          ? colors.safetyDeep
-                          : colors.warn
-                    }
-                  />
-                }
+                icon={<SiteGlyph size={17} color={palette.text} />}
                 title={`Time ${e.type} — ${e.project?.name ?? 'Site'}`}
-                subtitle={`${relativeStamp(e.entry_timestamp)}\n${coords(e.gps_lat, e.gps_lng)}`}
-                tone={toneForStatus(e.status)}
+                subtitle={`${relativeStamp(e.entry_timestamp)} · ${coords(e.gps_lat, e.gps_lng)}`}
+                tone={webToneFor(toneForStatus(e.status))}
                 pillLabel={e.status}
               />
             ))
           )}
-        </Section>
+        </WebSection>
 
         {/* ------------------------------ Requests ---------------------- */}
-        <Section title="Requests">
+        <WebSection title="Requests">
           {(data?.advances.length ?? 0) === 0 && (data?.leaves.length ?? 0) === 0 ? (
             <EmptyState title="No requests filed" />
           ) : (
             <>
               {data!.advances.map((a) => (
-                <ListCard
+                <GlassListRow
                   key={`a-${a.id}`}
-                  iconBg={colors.neutralBg}
-                  icon={<CashIcon size={17} color={colors.steel} />}
+                  icon={<CashIcon size={17} color={palette.text} />}
                   title="Cash advance requested"
                   subtitle={`${a.reason || 'No reason given'} · ${relativeStamp(a.created_at)}`}
-                  tone={toneForStatus(a.status)}
+                  tone={webToneFor(toneForStatus(a.status))}
                   pillLabel={a.status}
                 />
               ))}
               {data!.leaves.map((l) => (
-                <ListCard
+                <GlassListRow
                   key={`l-${l.id}`}
-                  iconBg={colors.neutralBg}
-                  icon={<CalendarIcon size={17} color={colors.steel} />}
+                  icon={<CalendarIcon size={17} color={palette.text} />}
                   title={`${l.leave_type} · ${dateRange(l.date_from, l.date_to)}`}
                   subtitle={`${l.reason || 'No reason given'} · ${relativeStamp(l.created_at)}`}
-                  tone={toneForStatus(l.status)}
+                  tone={webToneFor(toneForStatus(l.status))}
                   pillLabel={l.status}
                 />
               ))}
             </>
           )}
-        </Section>
+        </WebSection>
 
         {/* ----------------------------- Separation --------------------- */}
-        <Section title="Employment status">
-          <Card>
+        <WebSection title="Employment status">
+          <GlassCard>
             {worker.employment_status === 'active' ? (
               <>
-                <Text style={type.cardTitle}>Active</Text>
-                <Text style={[type.cardSub, { marginTop: 2 }]}>
+                <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>Active</Text>
+                <Text style={{ fontSize: 12, color: palette.muted, marginTop: 2, lineHeight: 17 }}>
                   Tagging a separation removes this worker from your roster and Team tab
                   immediately and routes the case to HR/Admin, who decide by hand what happens to
                   any unfinalized pay. Their history and payslips are never deleted.
                 </Text>
                 <View style={{ marginTop: 14, gap: 8 }}>
                   {SEPARATION_OPTIONS.map((o) => (
-                    <SecondaryButton
+                    <GlassOutlineButton
                       key={o.value}
                       label={`Tag as ${o.label}`}
                       disabled={tagging}
@@ -353,14 +340,11 @@ export default function WorkerDetailScreen() {
               </>
             ) : (
               <>
-                <View style={s.pillRow}>
-                  <Text style={type.cardTitle}>Separated</Text>
-                  <Pill
-                    label={worker.employment_status}
-                    tone={toneForStatus(worker.employment_status)}
-                  />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>Separated</Text>
+                  <WebPill label={worker.employment_status} tone={webToneFor(toneForStatus(worker.employment_status))} />
                 </View>
-                <Text style={[type.cardSub, { marginTop: 4 }]}>
+                <Text style={{ fontSize: 12, color: palette.muted, marginTop: 6, lineHeight: 17 }}>
                   Tagged{' '}
                   {worker.employment_status_set_at
                     ? relativeStamp(worker.employment_status_set_at)
@@ -369,44 +353,9 @@ export default function WorkerDetailScreen() {
                 </Text>
               </>
             )}
-          </Card>
-        </Section>
-      </ScreenBody>
-    </>
+          </GlassCard>
+        </WebSection>
+      </ScrollView>
+    </GlassScreen>
   );
 }
-
-const s = StyleSheet.create({
-  hero: { flexDirection: 'row', gap: 14, alignItems: 'center', marginBottom: spacing.xl },
-  pillRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  avatar: {
-    width: 58,
-    height: 58,
-    borderRadius: radius.lg,
-    backgroundColor: colors.steel,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { color: '#fff', fontFamily: fonts.bodyBold, fontSize: 19 },
-  evidenceRow: { flexDirection: 'row', gap: spacing.lg },
-  evidenceItem: { alignItems: 'center', gap: 7 },
-  evidenceLabel: { fontSize: 11, color: colors.muted, fontFamily: fonts.bodySemi },
-  incompleteNote: {
-    fontSize: 11.5,
-    color: colors.warn,
-    lineHeight: 17,
-    marginTop: 12,
-    fontFamily: fonts.body,
-  },
-  contractRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
-  contractIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.paper,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

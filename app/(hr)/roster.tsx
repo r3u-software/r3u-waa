@@ -21,7 +21,6 @@ import { useAsync } from '../../src/lib/useAsync';
 import { fetchAllWorkers, fetchProjects, fetchSupervisors } from '../../src/lib/queries';
 import { EmptyState, Loader, StatusStrip } from '../../src/components/ui';
 import { toneForStatus } from '../../src/theme';
-import { initialsOf } from '../../src/lib/format';
 import { WebShell } from '../../src/web/WebShell';
 import { useWebTheme } from '../../src/web/webTheme';
 import {
@@ -33,8 +32,8 @@ import {
   WebPill,
   WebSection,
   webToneFor,
+  WorkerCell,
 } from '../../src/web/webUi';
-import { LinearGradient } from 'expo-linear-gradient';
 
 /**
  * There is no "which workers report to which supervisor" table; the grouping
@@ -158,35 +157,6 @@ export default function HrRoster() {
         </Text>
       ) : null}
     </WebShell>
-  );
-}
-
-/** The `.tname` pattern from the reference dashboard — a gradient avatar
- * initials mark, a bold name, a muted subtitle — used for every "who" column
- * across the redesigned data tables (Roster here; Payroll grid reuses it). */
-export function WorkerCell({ name, sub }: { name: string; sub?: string }) {
-  const { palette } = useWebTheme();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-      <LinearGradient
-        colors={[palette.accent, palette.accent2]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }}
-      >
-        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 11 }}>{initialsOf(name)}</Text>
-      </LinearGradient>
-      <View style={{ minWidth: 0 }}>
-        <Text style={{ fontSize: 12.5, fontWeight: '700', color: palette.text }} numberOfLines={1}>
-          {name}
-        </Text>
-        {sub ? (
-          <Text style={{ fontSize: 10.5, color: palette.muted }} numberOfLines={1}>
-            {sub}
-          </Text>
-        ) : null}
-      </View>
-    </View>
   );
 }
 

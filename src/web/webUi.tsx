@@ -1,11 +1,12 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Line, LinearGradient, Polygon, Polyline, Stop } from 'react-native-svg';
 import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useWebTheme, webOnlyStyle, WEB_THEMES, WebModePref, WebPalette } from './webTheme';
 import { MonitorIcon, MoonIcon, SunIcon } from '../components/icons';
+import { initialsOf } from '../lib/format';
 
 /**
  * Presentational primitives for the HR/Admin + Platform Owner web dashboard —
@@ -373,6 +374,34 @@ export function GlassScreen({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** `GlassScreen` + the standard pull-to-refresh, safe-area-aware ScrollView
+ * every top-level tab screen needs — Supervisor's Home/Roster/Team/Approvals
+ * all share this exact shell (mirrors the pattern Worker's own tabs already
+ * had, just not previously factored out since only one screen needed it at
+ * the time). */
+export function GlassPullScreen({
+  children,
+  loading,
+  onRefresh,
+}: {
+  children: React.ReactNode;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  const { palette } = useWebTheme();
+  const insets = useSafeAreaInsets();
+  return (
+    <GlassScreen>
+      <ScrollView
+        contentContainerStyle={{ padding: 20, paddingTop: insets.top + 20, paddingBottom: 40 }}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={palette.muted} />}
+      >
+        {children}
+      </ScrollView>
+    </GlassScreen>
+  );
+}
+
 /** Icon + title/subtitle + status pill, tappable — the native equivalent of
  * `ui.tsx`'s `ListCard`, for activity feeds (punches, cash advances, leave
  * requests) on the glass canvas. */
@@ -411,6 +440,36 @@ export function GlassListRow({
         {pillLabel ? <WebPill label={pillLabel} tone={tone} /> : null}
       </View>
     </GlassCard>
+  );
+}
+
+/** Gradient-initials avatar + name (+ optional subtitle) — the "who" cell
+ * every worker/supervisor-listing table or row needs. Originally local to
+ * `(hr)/roster.tsx`; promoted here once Supervisor's own Roster/Team/Home
+ * screens needed the exact same cell. */
+export function WorkerCell({ name, sub }: { name: string; sub?: string }) {
+  const { palette } = useWebTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <ExpoLinearGradient
+        colors={[palette.accent, palette.accent2]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 11 }}>{initialsOf(name)}</Text>
+      </ExpoLinearGradient>
+      <View style={{ minWidth: 0 }}>
+        <Text style={{ fontSize: 12.5, fontWeight: '700', color: palette.text }} numberOfLines={1}>
+          {name}
+        </Text>
+        {sub ? (
+          <Text style={{ fontSize: 10.5, color: palette.muted }} numberOfLines={1}>
+            {sub}
+          </Text>
+        ) : null}
+      </View>
+    </View>
   );
 }
 

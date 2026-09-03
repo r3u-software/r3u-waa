@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, Text, View } from 'react-native';
 import { SignedImage } from './SignedImage';
-import { ApproveRow, Card, Field, Pill, PrimaryButton, SecondaryButton } from './ui';
 import { CalendarIcon, CashIcon } from './icons';
-import { colors, fonts, radius, spacing, toneForStatus, type } from '../theme';
+import { useWebTheme } from '../web/webTheme';
+import { GlassButton, GlassCard, GlassField, GlassOutlineButton, WebPill, webToneFor } from '../web/webUi';
+import { toneForStatus } from '../theme';
 import { coords, dateRange, relativeStamp } from '../lib/format';
 import type { WaaCashAdvanceDetailed, WaaLeaveRequestDetailed, WaaTimeEntryDetailed } from '../lib/types';
+
+/**
+ * Supervisor's approval cards — Supervisor's own Home and Approvals tabs are
+ * the last two native screens still on the paper theme (R3U-WAA-WEB-REDESIGN.md's
+ * native follow-up, this pass). Reskinned onto the same glass primitives as
+ * Worker's screens; the approve/decline/decline-remarks *logic* here is
+ * byte-for-byte unchanged, view layer only.
+ */
 
 /**
  * A pending time punch awaiting supervisor judgement: selfie thumbnail (signed
@@ -23,26 +32,35 @@ export function PunchApprovalCard({
   busy: boolean;
   onDecide: (decision: 'approved' | 'declined') => void;
 }) {
+  const { palette } = useWebTheme();
   return (
-    <Card>
-      <View style={s.row}>
+    <GlassCard style={{ marginBottom: 10 }}>
+      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
         <SignedImage bucket="waa-selfies" path={entry.selfie_url} size={44} />
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={type.cardTitle}>{entry.worker?.full_name ?? 'Worker'}</Text>
-          <Text style={type.cardSub}>
-            Time {entry.type} · {entry.project?.name ?? 'Site'} ·{' '}
-            {relativeStamp(entry.entry_timestamp)}
+          <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>
+            {entry.worker?.full_name ?? 'Worker'}
           </Text>
-          <Text style={s.gps}>{coords(entry.gps_lat, entry.gps_lng)}</Text>
+          <Text style={{ fontSize: 12, color: palette.muted }}>
+            Time {entry.type} · {entry.project?.name ?? 'Site'} · {relativeStamp(entry.entry_timestamp)}
+          </Text>
+          <Text style={{ fontSize: 11, color: palette.muted, marginTop: 1 }}>
+            {coords(entry.gps_lat, entry.gps_lng)}
+          </Text>
         </View>
-        <Pill label="Pending" tone="pending" />
+        <WebPill label="Pending" tone="info" />
       </View>
-      <ApproveRow
-        busy={busy}
-        onApprove={() => onDecide('approved')}
-        onDecline={() => onDecide('declined')}
-      />
-    </Card>
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+        <GlassOutlineButton label="Decline" onPress={() => onDecide('declined')} disabled={busy} style={{ flex: 1 }} />
+        <GlassButton
+          label={busy ? 'Working…' : 'Approve'}
+          tone="good"
+          onPress={() => onDecide('approved')}
+          loading={busy}
+          style={{ flex: 1 }}
+        />
+      </View>
+    </GlassCard>
   );
 }
 
@@ -55,24 +73,26 @@ export function PunchApprovalCard({
  * Payroll tab.
  */
 export function CashAdvanceNoticeCard({ request }: { request: WaaCashAdvanceDetailed }) {
+  const { palette } = useWebTheme();
   return (
-    <Card>
-      <View style={s.row}>
-        <View style={s.icon}>
-          <CashIcon size={17} color={colors.safetyDeep} />
+    <GlassCard style={{ marginBottom: 10 }}>
+      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+        <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: palette.hover, alignItems: 'center', justifyContent: 'center' }}>
+          <CashIcon size={17} color={palette.accent2} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={type.cardTitle}>Cash advance requested</Text>
-          <Text style={type.cardSub}>
-            {request.worker?.full_name ?? 'Worker'} ·{' '}
-            {request.reason ? `"${request.reason}"` : 'No reason given'}
+          <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>Cash advance requested</Text>
+          <Text style={{ fontSize: 12, color: palette.muted }}>
+            {request.worker?.full_name ?? 'Worker'} · {request.reason ? `"${request.reason}"` : 'No reason given'}
           </Text>
-          <Text style={s.stamp}>Filed {relativeStamp(request.created_at)}</Text>
+          <Text style={{ fontSize: 11, color: palette.muted, marginTop: 1 }}>Filed {relativeStamp(request.created_at)}</Text>
         </View>
-        <Pill label={request.status} tone={toneForStatus(request.status)} />
+        <WebPill label={request.status} tone={webToneFor(toneForStatus(request.status))} />
       </View>
-      <Text style={s.handoffNote}>HR/Admin decides cash advances.</Text>
-    </Card>
+      <Text style={{ fontSize: 11, color: palette.muted, fontWeight: '600', marginTop: 10 }}>
+        HR/Admin decides cash advances.
+      </Text>
+    </GlassCard>
   );
 }
 
@@ -89,6 +109,7 @@ export function RequestApprovalCard({
   busy: boolean;
   onDecide: (decision: 'approved' | 'declined', remarks?: string) => void;
 }) {
+  const { palette } = useWebTheme();
   const [declining, setDeclining] = useState(false);
   const [remarks, setRemarks] = useState('');
 
@@ -96,43 +117,64 @@ export function RequestApprovalCard({
 
   return (
     <>
-      <Card>
-        <View style={s.row}>
-          <View style={s.icon}>
-            <CalendarIcon size={17} color={colors.safetyDeep} />
+      <GlassCard style={{ marginBottom: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+          <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: palette.hover, alignItems: 'center', justifyContent: 'center' }}>
+            <CalendarIcon size={17} color={palette.accent2} />
           </View>
           <View style={{ flex: 1, gap: 2 }}>
-            <Text style={type.cardTitle}>{title}</Text>
-            <Text style={type.cardSub}>
-              {request.worker?.full_name ?? 'Worker'} ·{' '}
-              {request.reason ? `"${request.reason}"` : 'No reason given'}
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>{title}</Text>
+            <Text style={{ fontSize: 12, color: palette.muted }}>
+              {request.worker?.full_name ?? 'Worker'} · {request.reason ? `"${request.reason}"` : 'No reason given'}
             </Text>
-            <Text style={s.stamp}>Filed {relativeStamp(request.created_at)}</Text>
+            <Text style={{ fontSize: 11, color: palette.muted, marginTop: 1 }}>Filed {relativeStamp(request.created_at)}</Text>
           </View>
-          <Pill label="Review" tone="pending" />
+          <WebPill label="Review" tone="info" />
         </View>
-        <ApproveRow
-          busy={busy}
-          onApprove={() => onDecide('approved')}
-          onDecline={() => setDeclining(true)}
-        />
-      </Card>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+          <GlassOutlineButton label="Decline" onPress={() => setDeclining(true)} disabled={busy} style={{ flex: 1 }} />
+          <GlassButton
+            label={busy ? 'Working…' : 'Approve'}
+            tone="good"
+            onPress={() => onDecide('approved')}
+            loading={busy}
+            style={{ flex: 1 }}
+          />
+        </View>
+      </GlassCard>
 
       <Modal visible={declining} transparent animationType="slide" onRequestClose={() => setDeclining(false)}>
-        <Pressable style={s.backdrop} onPress={() => setDeclining(false)}>
-          <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={s.sheetTitle}>Decline this request?</Text>
-            <Text style={s.sheetSub}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
+          onPress={() => setDeclining(false)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: palette.panelSolid,
+              borderWidth: 1,
+              borderColor: palette.border,
+              borderBottomWidth: 0,
+              borderTopLeftRadius: 22,
+              borderTopRightRadius: 22,
+              padding: 22,
+              paddingBottom: 40,
+            }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text, marginBottom: 4 }}>
+              Decline this request?
+            </Text>
+            <Text style={{ fontSize: 12.5, color: palette.muted, lineHeight: 18, marginBottom: 16 }}>
               Your remarks are shown to {request.worker?.full_name ?? 'the worker'}.
             </Text>
-            <Field
+            <GlassField
               label="Remarks (optional)"
               value={remarks}
               onChangeText={setRemarks}
               placeholder="Why are you declining?"
               multiline
             />
-            <PrimaryButton
+            <GlassButton
               label="Decline request"
               tone="warn"
               onPress={() => {
@@ -141,56 +183,10 @@ export function RequestApprovalCard({
                 setRemarks('');
               }}
             />
-            <SecondaryButton
-              label="Cancel"
-              onPress={() => setDeclining(false)}
-              style={{ marginTop: 10 }}
-            />
+            <GlassOutlineButton label="Cancel" onPress={() => setDeclining(false)} style={{ marginTop: 10 }} />
           </Pressable>
         </Pressable>
       </Modal>
     </>
   );
 }
-
-const s = StyleSheet.create({
-  row: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
-  icon: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.md,
-    backgroundColor: colors.pendingBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gps: { fontSize: 11, color: colors.muted, marginTop: 3, fontFamily: fonts.body },
-  stamp: { fontSize: 11, color: colors.muted, marginTop: 3, fontFamily: fonts.body },
-  handoffNote: {
-    fontSize: 11,
-    color: colors.muted,
-    marginTop: 10,
-    fontFamily: fonts.bodySemi,
-  },
-  backdrop: { flex: 1, backgroundColor: 'rgba(28,27,24,0.5)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colors.paper,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    padding: spacing.xl,
-    paddingBottom: 40,
-  },
-  sheetTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.ink,
-    marginBottom: 4,
-  },
-  sheetSub: {
-    fontSize: 12.5,
-    color: colors.muted,
-    marginBottom: spacing.lg,
-    lineHeight: 18,
-    fontFamily: fonts.body,
-  },
-});

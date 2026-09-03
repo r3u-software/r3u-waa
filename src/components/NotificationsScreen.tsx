@@ -1,12 +1,12 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { useSession } from '../lib/session';
 import { useNotifications } from '../lib/useNotifications';
 import type { RecipientType } from '../lib/types';
-import { ScreenBody } from './Screen';
-import { EmptyState, Loader, Pill } from './ui';
-import { colors, fonts, radius, spacing, type } from '../theme';
+import { EmptyState } from './ui';
+import { useWebTheme } from '../web/webTheme';
+import { GlassScreen, WebPill } from '../web/webUi';
 import { relativeStamp } from '../lib/format';
 
 /**
@@ -19,12 +19,23 @@ import { relativeStamp } from '../lib/format';
  * `(worker)`/`(supervisor)`/`(hr)` as valid first segments for a signed-in
  * user, so a route outside every group got bounced straight back to the role
  * home. Living inside the group keeps `segments[0]` correct and gives the
- * screen the group Stack's header (with a back button) for free.
+ * screen the group Stack's header (with a back button) for free — which is
+ * also why there's no manual safe-area top padding below: the Stack header
+ * already reserves that space, same as every other pushed glass screen
+ * (`punch.tsx`, `cash-advance.tsx`, `leave.tsx`).
  *
- * HR/Admin has its own tray as a tab (`app/(hr)/(tabs)/notifications.tsx`).
+ * HR/Admin has its own tray as a tab (`app/(hr)/(tabs)/notifications.tsx`,
+ * its own web screen, untouched by this pass).
+ *
+ * Reskinned onto the glass system alongside the rest of Supervisor's own
+ * screens — Worker already reads its own theme context from its own
+ * `WebThemeProvider` (`(worker)/_layout.tsx`), so this needed no branching
+ * to work correctly for both groups; whichever group's Stack renders this
+ * screen, `useWebTheme()` picks up that group's own provider.
  */
 export function NotificationsScreen() {
   const { role, worker, supervisor, hrAdmin } = useSession();
+  const { palette } = useWebTheme();
   const principal =
     role === 'worker' ? worker : role === 'supervisor' ? supervisor : hrAdmin;
   // See the same narrowing in `Screen.tsx`: `recipient_type` has no Platform
@@ -39,20 +50,24 @@ export function NotificationsScreen() {
   return (
     <>
       <Stack.Screen options={{ title: 'Notifications' }} />
-      <ScreenBody refreshing={loading} onRefresh={reload}>
-        <View style={s.head}>
-          <Text style={type.sectionTitle}>
+      <GlassScreen>
+      <ScrollView
+        contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={palette.muted} />}
+      >
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>
             {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
           </Text>
           {unreadCount > 0 ? (
             <Pressable onPress={markAllRead} hitSlop={8}>
-              <Text style={type.sectionLink}>Mark all read</Text>
+              <Text style={{ fontSize: 12.5, color: palette.accent2, fontWeight: '700' }}>Mark all read</Text>
             </Pressable>
           ) : null}
         </View>
 
         {loading && items.length === 0 ? (
-          <Loader label="Loading notifications" />
+          <Text style={{ color: palette.muted, textAlign: 'center', paddingVertical: 24 }}>Loading…</Text>
         ) : items.length === 0 ? (
           <EmptyState
             title="Nothing yet"
@@ -64,43 +79,38 @@ export function NotificationsScreen() {
               key={n.id}
               onPress={() => !n.is_read && markRead(n.id)}
               style={({ pressed }) => [
-                s.row,
-                !n.is_read && s.rowUnread,
-                pressed && { opacity: 0.75 },
+                {
+                  backgroundColor: palette.panel,
+                  borderWidth: 1,
+                  borderColor: n.is_read ? palette.border : palette.accent2,
+                  borderRadius: 16,
+                  padding: 14,
+                  marginBottom: 10,
+                  gap: 6,
+                },
+                pressed && { opacity: 0.8 },
               ]}
             >
-              <View style={s.rowTop}>
-                <Text style={[s.message, !n.is_read && s.messageUnread]}>{n.message}</Text>
-                {!n.is_read ? <Pill label="New" tone="pending" /> : null}
+              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+                <Text
+                  style={{
+                    flex: 1,
+                    fontSize: 13,
+                    color: palette.text,
+                    lineHeight: 18,
+                    fontWeight: n.is_read ? '400' : '700',
+                  }}
+                >
+                  {n.message}
+                </Text>
+                {!n.is_read ? <WebPill label="New" tone="info" /> : null}
               </View>
-              <Text style={s.stamp}>{relativeStamp(n.created_at)}</Text>
+              <Text style={{ fontSize: 11.5, color: palette.muted }}>{relativeStamp(n.created_at)}</Text>
             </Pressable>
           ))
         )}
-      </ScreenBody>
+      </ScrollView>
+      </GlassScreen>
     </>
   );
 }
-
-const s = StyleSheet.create({
-  head: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: spacing.md,
-  },
-  row: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.xl,
-    padding: 14,
-    marginBottom: 10,
-    gap: 6,
-  },
-  rowUnread: { borderLeftWidth: 3, borderLeftColor: colors.safety },
-  rowTop: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  message: { flex: 1, fontSize: 13, color: colors.ink, lineHeight: 18, fontFamily: fonts.body },
-  messageUnread: { fontFamily: fonts.bodySemi },
-  stamp: { fontSize: 11.5, color: colors.muted, fontFamily: fonts.body },
-});

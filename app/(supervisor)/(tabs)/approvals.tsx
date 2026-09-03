@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import { useSupervisor } from '../../../src/lib/session';
 import { useAsync } from '../../../src/lib/useAsync';
 import {
@@ -9,20 +9,21 @@ import {
   fetchPendingLeaveRequests,
   fetchPendingTimeEntries,
 } from '../../../src/lib/queries';
-import { ScreenBody, TopBar } from '../../../src/components/Screen';
-import { EmptyState, Loader, Section } from '../../../src/components/ui';
+import { EmptyState } from '../../../src/components/ui';
 import {
   CashAdvanceNoticeCard,
   PunchApprovalCard,
   RequestApprovalCard,
 } from '../../../src/components/approvals';
-import { colors, fonts, radius, type } from '../../../src/theme';
+import { useWebTheme } from '../../../src/web/webTheme';
+import { Chip, GlassPullScreen } from '../../../src/web/webUi';
 
 type Queue = 'punches' | 'advances' | 'leave';
 
 /** The full pending queues — same approve/decline pattern as the dashboard. */
 export default function ApprovalsScreen() {
   const supervisor = useSupervisor();
+  const { palette } = useWebTheme();
   const [queue, setQueue] = useState<Queue>('punches');
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -54,90 +55,75 @@ export default function ApprovalsScreen() {
   ];
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.paper }}>
-      <TopBar label="Approvals" />
-      <ScreenBody refreshing={loading} onRefresh={reload}>
-        <Text style={[type.greet, { marginBottom: 14 }]}>Waiting on you</Text>
+    <GlassPullScreen loading={loading} onRefresh={reload}>
+      <Text style={{ fontSize: 22, fontWeight: '700', color: palette.text, marginBottom: 14 }}>Waiting on you</Text>
 
-        <View style={s.filterRow}>
-          {tabs.map((t) => (
-            <Pressable
-              key={t.key}
-              onPress={() => setQueue(t.key)}
-              style={[s.filterChip, queue === t.key && s.filterChipActive]}
-            >
-              <Text style={[s.filterText, queue === t.key && s.filterTextActive]}>
-                {t.label} {t.count > 0 ? `(${t.count})` : ''}
-              </Text>
-            </Pressable>
-          ))}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 18 }}>
+        {tabs.map((t) => (
+          <Chip
+            key={t.key}
+            label={`${t.label}${t.count > 0 ? ` (${t.count})` : ''}`}
+            active={queue === t.key}
+            onPress={() => setQueue(t.key)}
+          />
+        ))}
+      </ScrollView>
+
+      {loading && !data ? (
+        <Text style={{ color: palette.muted, textAlign: 'center', paddingVertical: 16 }}>Loading…</Text>
+      ) : queue === 'punches' ? (
+        <View>
+          <SectionTitle>Pending time punches</SectionTitle>
+          {(data?.punches.length ?? 0) === 0 ? (
+            <EmptyState
+              title="No punches to review"
+              body="New time in / time out records appear here the moment a worker submits one."
+            />
+          ) : (
+            data!.punches.map((e) => (
+              <PunchApprovalCard
+                key={e.id}
+                entry={e}
+                busy={busyId === e.id}
+                onDecide={(d) => decide(() => decideTimeEntry(e.id, d, supervisor.id), e.id)}
+              />
+            ))
+          )}
         </View>
-
-        {loading && !data ? (
-          <Loader />
-        ) : queue === 'punches' ? (
-          <Section title="Pending time punches">
-            {(data?.punches.length ?? 0) === 0 ? (
-              <EmptyState
-                title="No punches to review"
-                body="New time in / time out records appear here the moment a worker submits one."
+      ) : queue === 'advances' ? (
+        <View>
+          <SectionTitle>Cash advance requests</SectionTitle>
+          {(data?.advances.length ?? 0) === 0 ? (
+            <EmptyState
+              title="No advance requests to show"
+              body="Cash advances are decided by HR/Admin now. Amounts are not visible to supervisors."
+            />
+          ) : (
+            data!.advances.map((a) => <CashAdvanceNoticeCard key={a.id} request={a} />)
+          )}
+        </View>
+      ) : (
+        <View>
+          <SectionTitle>Leave requests</SectionTitle>
+          {(data?.leaves.length ?? 0) === 0 ? (
+            <EmptyState title="No leave requests" body="Leave filings from your workers land here." />
+          ) : (
+            data!.leaves.map((l) => (
+              <RequestApprovalCard
+                key={l.id}
+                request={l}
+                busy={busyId === l.id}
+                onDecide={(d, r) => decide(() => decideLeaveRequest(l.id, d, supervisor.id, r), l.id)}
               />
-            ) : (
-              data!.punches.map((e) => (
-                <PunchApprovalCard
-                  key={e.id}
-                  entry={e}
-                  busy={busyId === e.id}
-                  onDecide={(d) => decide(() => decideTimeEntry(e.id, d, supervisor.id), e.id)}
-                />
-              ))
-            )}
-          </Section>
-        ) : queue === 'advances' ? (
-          <Section title="Cash advance requests">
-            {(data?.advances.length ?? 0) === 0 ? (
-              <EmptyState
-                title="No advance requests to show"
-                body="Cash advances are decided by HR/Admin now. Amounts are not visible to supervisors."
-              />
-            ) : (
-              data!.advances.map((a) => <CashAdvanceNoticeCard key={a.id} request={a} />)
-            )}
-          </Section>
-        ) : (
-          <Section title="Leave requests">
-            {(data?.leaves.length ?? 0) === 0 ? (
-              <EmptyState title="No leave requests" body="Leave filings from your workers land here." />
-            ) : (
-              data!.leaves.map((l) => (
-                <RequestApprovalCard
-                  key={l.id}
-                  request={l}
-                  busy={busyId === l.id}
-                  onDecide={(d, r) =>
-                    decide(() => decideLeaveRequest(l.id, d, supervisor.id, r), l.id)
-                  }
-                />
-              ))
-            )}
-          </Section>
-        )}
-      </ScreenBody>
-    </View>
+            ))
+          )}
+        </View>
+      )}
+    </GlassPullScreen>
   );
 }
 
-const s = StyleSheet.create({
-  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 18 },
-  filterChip: {
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.line,
-  },
-  filterChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  filterText: { fontSize: 12, fontFamily: fonts.bodySemi, color: colors.muted },
-  filterTextActive: { color: colors.paper },
-});
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  const { palette } = useWebTheme();
+  return <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text, marginBottom: 10 }}>{children}</Text>;
+}

@@ -9,19 +9,11 @@ import {
   fetchWorkerLeaveOverlapFlag,
   type TeamRow,
 } from '../../../src/lib/queries';
-import { ScreenBody, TopBar } from '../../../src/components/Screen';
-import {
-  Card,
-  EmptyState,
-  Loader,
-  Pill,
-  PrimaryButton,
-  SecondaryButton,
-  Section,
-  StatusStrip,
-} from '../../../src/components/ui';
-import { colors, fonts, radius, spacing, type } from '../../../src/theme';
-import { cutoffFor, dateRange, hours, initialsOf, toDateColumn } from '../../../src/lib/format';
+import { EmptyState } from '../../../src/components/ui';
+import { useWebTheme } from '../../../src/web/webTheme';
+import { GlassButton, GlassCard, GlassOutlineButton, GlassPullScreen, MetricCard, WebPill, WorkerCell } from '../../../src/web/webUi';
+import { WebPalette } from '../../../src/web/webTheme';
+import { cutoffFor, dateRange, hours, toDateColumn } from '../../../src/lib/format';
 
 /**
  * Supervisor Team tab.
@@ -37,9 +29,15 @@ import { cutoffFor, dateRange, hours, initialsOf, toDateColumn } from '../../../
  * Scope is the supervisor's own `employment_status = 'active'` workers — the
  * active filter is applied in the query, which is what makes a separated
  * worker disappear from here immediately after tagging.
+ *
+ * Same "keep the hand-rolled fixed-width table, only make its colors
+ * theme-reactive" call `(hr)/payroll-grid.tsx` made — this is a dense
+ * 8-column table too, not a fit for the generic flex-based `DataTable`.
  */
 export default function TeamScreen() {
   const supervisor = useSupervisor();
+  const { palette } = useWebTheme();
+  const gs = useMemo(() => glassStyles(palette), [palette]);
   const [detail, setDetail] = useState<TeamRow | null>(null);
 
   const { data, loading, reload } = useAsync(async () => {
@@ -72,112 +70,98 @@ export default function TeamScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.paper }}>
-      <TopBar label="Team" />
-      <ScreenBody refreshing={loading} onRefresh={reload}>
-        <Text style={type.eyebrow}>Current cutoff</Text>
-        <Text style={type.greet}>{data?.window.label ?? '—'}</Text>
-        <Text style={[type.subgreet, { marginBottom: 20 }]}>
-          Hours and leave that feed payroll · no pay figures on this screen
-        </Text>
+    <GlassPullScreen loading={loading} onRefresh={reload}>
+      <Text style={{ fontSize: 11, letterSpacing: 1, color: palette.muted, fontWeight: '700' }}>CURRENT CUTOFF</Text>
+      <Text style={{ fontSize: 22, fontWeight: '700', color: palette.text, marginTop: 3 }}>{data?.window.label ?? '—'}</Text>
+      <Text style={{ fontSize: 13, color: palette.muted, marginTop: 2, marginBottom: 16 }}>
+        Hours and leave that feed payroll · no pay figures on this screen
+      </Text>
 
-        <StatusStrip
-          chips={[
-            { value: totals.workers, label: 'Active workers', tone: 'ok' },
-            { value: Math.round(totals.hours), label: 'Hours logged', tone: 'pending' },
-            { value: totals.flagged, label: 'Open flags', tone: 'warn' },
-          ]}
-        />
+      <View style={{ flexDirection: 'row', gap: 9, marginBottom: 16 }}>
+        <MetricCard style={{ flex: 1, padding: 12 }} label="Active workers" value={String(totals.workers)} trendPct={null} />
+        <MetricCard style={{ flex: 1, padding: 12 }} label="Hours logged" value={String(Math.round(totals.hours))} trendPct={null} />
+        <MetricCard style={{ flex: 1, padding: 12 }} label="Open flags" value={String(totals.flagged)} trendPct={null} />
+      </View>
 
-        {totals.flagged > 0 ? (
-          <Card style={s.flagBanner}>
-            <Text style={s.flagBannerTitle}>
-              {totals.flagged} worker{totals.flagged === 1 ? '' : 's'} flagged
-            </Text>
-            <Text style={s.flagBannerBody}>
-              Overlapping leave requests block the office from moving this period's payroll run out
-              of draft. Open a flagged worker below to see and resolve the requests.
-            </Text>
-          </Card>
-        ) : null}
-
-        <Section title="Your team">
-          {loading && !data ? (
-            <Loader label="Adding up hours" />
-          ) : rows.length === 0 ? (
-            <EmptyState
-              title="No active workers"
-              body="Workers you register appear here. Separated workers drop off this list."
-            />
-          ) : (
-            <Card style={{ padding: 0, overflow: 'hidden' }}>
-              {/* Horizontal scroll so the full column set stays readable on a
-                  phone rather than being truncated into uselessness. */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View>
-                  <View style={[s.row, s.headRow]}>
-                    <Text style={[s.cell, s.cellWorker, s.headText]}>Worker</Text>
-                    <Text style={[s.cell, s.cellWide, s.headText]}>Position</Text>
-                    <Text style={[s.cell, s.cellNum, s.headText]}>Days</Text>
-                    <Text style={[s.cell, s.cellNum, s.headText]}>Hours</Text>
-                    <Text style={[s.cell, s.cellNum, s.headText]}>Paid lv</Text>
-                    <Text style={[s.cell, s.cellNum, s.headText]}>Unpaid lv</Text>
-                    <Text style={[s.cell, s.cellFlag, s.headText]}>Flags</Text>
-                    <Text style={[s.cell, s.cellWide, s.headText]}>Run status</Text>
-                  </View>
-
-                  {rows.map((r, i) => (
-                    <Pressable
-                      key={r.worker.id}
-                      onPress={() => setDetail(r)}
-                      style={({ pressed }) => [
-                        s.row,
-                        i === rows.length - 1 && s.rowLast,
-                        pressed && { backgroundColor: colors.paper },
-                      ]}
-                    >
-                      <View style={[s.cell, s.cellWorker, s.workerCell]}>
-                        <View style={s.avatar}>
-                          <Text style={s.initials}>{initialsOf(r.worker.full_name)}</Text>
-                        </View>
-                        <Text style={s.name} numberOfLines={1}>
-                          {r.worker.full_name}
-                        </Text>
-                      </View>
-                      <Text style={[s.cell, s.cellWide, s.body]} numberOfLines={1}>
-                        {r.worker.position || '—'}
-                      </Text>
-                      <Text style={[s.cell, s.cellNum, s.body]}>{r.days}</Text>
-                      <Text style={[s.cell, s.cellNum, s.body]}>{r.hours}</Text>
-                      <Text style={[s.cell, s.cellNum, s.muted]}>n/a</Text>
-                      <Text style={[s.cell, s.cellNum, s.body]}>{r.unpaidLeaveDays}</Text>
-                      <View style={[s.cell, s.cellFlag]}>
-                        {r.flagged ? (
-                          <Pill label="Overlap" tone="warn" />
-                        ) : (
-                          <Text style={s.muted}>—</Text>
-                        )}
-                      </View>
-                      <Text style={[s.cell, s.cellWide, s.muted]} numberOfLines={1}>
-                        Office only
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </ScrollView>
-            </Card>
-          )}
-
-          <Text style={s.footnote}>
-            "Paid lv" and "Run status" are set by HR/Admin in tables supervisors have no access to,
-            so they cannot be shown here. Every approved leave day this period is counted under
-            "Unpaid lv".
+      {totals.flagged > 0 ? (
+        <GlassCard style={{ marginBottom: 16, borderColor: palette.bad, gap: 4 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: palette.bad }}>
+            {totals.flagged} worker{totals.flagged === 1 ? '' : 's'} flagged
           </Text>
-        </Section>
-      </ScreenBody>
+          <Text style={{ fontSize: 11.5, color: palette.bad, lineHeight: 17 }}>
+            Overlapping leave requests block the office from moving this period's payroll run out
+            of draft. Open a flagged worker below to see and resolve the requests.
+          </Text>
+        </GlassCard>
+      ) : null}
+
+      <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text, marginBottom: 10 }}>Your team</Text>
+      {loading && !data ? (
+        <Text style={{ color: palette.muted, textAlign: 'center', paddingVertical: 16 }}>Adding up hours…</Text>
+      ) : rows.length === 0 ? (
+        <EmptyState
+          title="No active workers"
+          body="Workers you register appear here. Separated workers drop off this list."
+        />
+      ) : (
+        <View style={[gs.tableWrap]}>
+          {/* Horizontal scroll so the full column set stays readable on a
+              phone rather than being truncated into uselessness. */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View>
+              <View style={[s.row, gs.headRow]}>
+                <Text style={[s.cell, s.cellWorker, gs.headText]}>Worker</Text>
+                <Text style={[s.cell, s.cellWide, gs.headText]}>Position</Text>
+                <Text style={[s.cell, s.cellNum, gs.headText]}>Days</Text>
+                <Text style={[s.cell, s.cellNum, gs.headText]}>Hours</Text>
+                <Text style={[s.cell, s.cellNum, gs.headText]}>Paid lv</Text>
+                <Text style={[s.cell, s.cellNum, gs.headText]}>Unpaid lv</Text>
+                <Text style={[s.cell, s.cellFlag, gs.headText]}>Flags</Text>
+                <Text style={[s.cell, s.cellWide, gs.headText]}>Run status</Text>
+              </View>
+
+              {rows.map((r, i) => (
+                <Pressable
+                  key={r.worker.id}
+                  onPress={() => setDetail(r)}
+                  style={({ pressed }) => [
+                    s.row,
+                    gs.rowBorder,
+                    i === rows.length - 1 && s.rowLast,
+                    pressed && { backgroundColor: palette.hover },
+                  ]}
+                >
+                  <View style={[s.cell, s.cellWorker]}>
+                    <WorkerCell name={r.worker.full_name} />
+                  </View>
+                  <Text style={[s.cell, s.cellWide, gs.body]} numberOfLines={1}>
+                    {r.worker.position || '—'}
+                  </Text>
+                  <Text style={[s.cell, s.cellNum, gs.body]}>{r.days}</Text>
+                  <Text style={[s.cell, s.cellNum, gs.body]}>{r.hours}</Text>
+                  <Text style={[s.cell, s.cellNum, gs.muted]}>n/a</Text>
+                  <Text style={[s.cell, s.cellNum, gs.body]}>{r.unpaidLeaveDays}</Text>
+                  <View style={[s.cell, s.cellFlag]}>
+                    {r.flagged ? <WebPill label="Overlap" tone="bad" /> : <Text style={gs.muted}>—</Text>}
+                  </View>
+                  <Text style={[s.cell, s.cellWide, gs.muted]} numberOfLines={1}>
+                    Office only
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      )}
+
+      <Text style={{ fontSize: 11, color: palette.muted, lineHeight: 16, marginTop: 12 }}>
+        "Paid lv" and "Run status" are set by HR/Admin in tables supervisors have no access to, so
+        they cannot be shown here. Every approved leave day this period is counted under
+        "Unpaid lv".
+      </Text>
 
       <TeamRowSheet row={detail} onClose={() => setDetail(null)} />
-    </View>
+    </GlassPullScreen>
   );
 }
 
@@ -187,16 +171,28 @@ export default function TeamScreen() {
  * that one exists.
  */
 function TeamRowSheet({ row, onClose }: { row: TeamRow | null; onClose: () => void }) {
+  const { palette } = useWebTheme();
   if (!row) return null;
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={s.backdrop} onPress={onClose}>
-        <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
-          <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 40 }}>
-            <Text style={s.sheetTitle}>{row.worker.full_name}</Text>
-            <Text style={s.sheetSub}>{row.worker.position || 'No position set'}</Text>
+      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }} onPress={onClose}>
+        <Pressable
+          style={{
+            backgroundColor: palette.panelSolid,
+            borderWidth: 1,
+            borderColor: palette.border,
+            borderBottomWidth: 0,
+            borderTopLeftRadius: 22,
+            borderTopRightRadius: 22,
+            maxHeight: '85%',
+          }}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <ScrollView contentContainerStyle={{ padding: 22, paddingBottom: 40 }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>{row.worker.full_name}</Text>
+            <Text style={{ fontSize: 12.5, color: palette.muted, marginTop: 2 }}>{row.worker.position || 'No position set'}</Text>
 
-            <View style={s.statGrid}>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
               <Stat label="Days worked" value={String(row.days)} />
               <Stat label="Hours" value={hours(row.hours)} />
               <Stat label="Leave days" value={String(row.unpaidLeaveDays)} />
@@ -204,31 +200,44 @@ function TeamRowSheet({ row, onClose }: { row: TeamRow | null; onClose: () => vo
 
             {row.flagged ? (
               <>
-                <Text style={[type.sectionTitle, { marginTop: spacing.xl, marginBottom: 8 }]}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text, marginTop: 22, marginBottom: 8 }}>
                   Overlapping leave requests
                 </Text>
                 {row.overlapping.length === 0 ? (
-                  <Text style={s.sheetBody}>
+                  <Text style={{ fontSize: 12, color: palette.muted, lineHeight: 18, marginTop: 10 }}>
                     The office's check reports an overlap for this worker. Open their leave requests
                     from the Approvals tab to resolve it.
                   </Text>
                 ) : (
                   row.overlapping.map((l) => (
-                    <View key={l.id} style={s.leaveRow}>
+                    <View
+                      key={l.id}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 10,
+                        backgroundColor: palette.hover,
+                        borderRadius: 14,
+                        padding: 12,
+                        marginBottom: 8,
+                      }}
+                    >
                       <View style={{ flex: 1 }}>
-                        <Text style={s.leaveTitle}>
+                        <Text style={{ fontSize: 12.5, fontWeight: '600', color: palette.text }}>
                           {l.leave_type} · {dateRange(l.date_from, l.date_to)}
                         </Text>
-                        <Text style={s.leaveSub}>{l.reason || 'No reason given'}</Text>
+                        <Text style={{ fontSize: 11, color: palette.muted, marginTop: 2 }}>
+                          {l.reason || 'No reason given'}
+                        </Text>
                       </View>
-                      <Pill label={l.status} tone={l.status === 'pending' ? 'pending' : 'ok'} />
+                      <WebPill label={l.status} tone={l.status === 'pending' ? 'info' : 'good'} />
                     </View>
                   ))
                 )}
-                <Text style={s.sheetBody}>
+                <Text style={{ fontSize: 12, color: palette.muted, lineHeight: 18, marginTop: 10 }}>
                   Declining one of these clears the flag and unblocks the payroll run.
                 </Text>
-                <PrimaryButton
+                <GlassButton
                   label="Go to leave approvals"
                   onPress={() => {
                     onClose();
@@ -238,12 +247,12 @@ function TeamRowSheet({ row, onClose }: { row: TeamRow | null; onClose: () => vo
                 />
               </>
             ) : (
-              <Text style={[s.sheetBody, { marginTop: spacing.lg }]}>
+              <Text style={{ fontSize: 12, color: palette.muted, lineHeight: 18, marginTop: 16 }}>
                 No open flags for this worker.
               </Text>
             )}
 
-            <SecondaryButton
+            <GlassOutlineButton
               label="Open worker profile"
               onPress={() => {
                 onClose();
@@ -251,7 +260,7 @@ function TeamRowSheet({ row, onClose }: { row: TeamRow | null; onClose: () => vo
               }}
               style={{ marginTop: 10 }}
             />
-            <SecondaryButton label="Close" onPress={onClose} style={{ marginTop: 10 }} />
+            <GlassOutlineButton label="Close" onPress={onClose} style={{ marginTop: 10 }} />
           </ScrollView>
         </Pressable>
       </Pressable>
@@ -260,96 +269,40 @@ function TeamRowSheet({ row, onClose }: { row: TeamRow | null; onClose: () => vo
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
+  const { palette } = useWebTheme();
   return (
-    <View style={s.stat}>
-      <Text style={s.statValue}>{value}</Text>
-      <Text style={s.statLabel}>{label}</Text>
+    <View style={{ flex: 1, backgroundColor: palette.hover, borderRadius: 14, padding: 12 }}>
+      <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>{value}</Text>
+      <Text style={{ fontSize: 10.5, color: palette.muted, marginTop: 3 }}>{label}</Text>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  flagBanner: { backgroundColor: colors.warnBg, borderColor: colors.warn, gap: 4 },
-  flagBannerTitle: { fontSize: 13, fontFamily: fonts.bodyBold, color: colors.warn },
-  flagBannerBody: { fontSize: 11.5, color: colors.warn, lineHeight: 17, fontFamily: fonts.body },
+/** Only the color-bearing keys — layout-only keys stay in the static `s`
+ * StyleSheet below, same split `(hr)/payroll-grid.tsx` uses. */
+function glassStyles(palette: WebPalette) {
+  return StyleSheet.create({
+    tableWrap: { backgroundColor: palette.panelSolid, borderWidth: 1, borderColor: palette.border, borderRadius: 15, overflow: 'hidden' },
+    headRow: { backgroundColor: palette.hover, borderBottomColor: palette.border },
+    headText: { fontSize: 10, letterSpacing: 0.6, color: palette.muted, fontWeight: '700' },
+    rowBorder: { borderBottomColor: palette.border },
+    body: { fontSize: 12.5, color: palette.text },
+    muted: { fontSize: 12, color: palette.muted },
+  });
+}
 
+const s = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 11,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.line,
   },
   rowLast: { borderBottomWidth: 0 },
-  headRow: { backgroundColor: colors.paper },
-  headText: { fontSize: 10, letterSpacing: 0.6, color: colors.muted, fontFamily: fonts.bodyBold },
   cell: { paddingRight: 12 },
   cellWorker: { width: 150 },
   cellWide: { width: 90 },
   cellNum: { width: 58, textAlign: 'right' },
   cellFlag: { width: 76 },
-  workerCell: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: radius.sm,
-    backgroundColor: colors.paper,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initials: { fontSize: 10, fontFamily: fonts.bodyBold, color: colors.steel },
-  name: { flex: 1, fontSize: 12.5, fontFamily: fonts.bodySemi, color: colors.ink },
-  body: { fontSize: 12.5, color: colors.ink, fontFamily: fonts.body },
-  muted: { fontSize: 12, color: colors.muted, fontFamily: fonts.body },
-  footnote: {
-    fontSize: 11,
-    color: colors.muted,
-    lineHeight: 16,
-    marginTop: 12,
-    fontFamily: fonts.body,
-  },
-
-  backdrop: { flex: 1, backgroundColor: 'rgba(28,27,24,0.5)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colors.paper,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    maxHeight: '85%',
-  },
-  sheetTitle: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '700', color: colors.ink },
-  sheetSub: { fontSize: 12.5, color: colors.muted, marginTop: 2, fontFamily: fonts.body },
-  sheetBody: {
-    fontSize: 12,
-    color: colors.muted,
-    lineHeight: 18,
-    marginTop: 10,
-    fontFamily: fonts.body,
-  },
-  statGrid: { flexDirection: 'row', gap: 10, marginTop: spacing.lg },
-  stat: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.lg,
-    padding: 12,
-  },
-  statValue: { fontFamily: fonts.serif, fontSize: 20, fontWeight: '700', color: colors.ink },
-  statLabel: { fontSize: 10.5, color: colors.muted, marginTop: 3, fontFamily: fonts.body },
-  leaveRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.lg,
-    padding: 12,
-    marginBottom: 8,
-  },
-  leaveTitle: { fontSize: 12.5, fontFamily: fonts.bodySemi, color: colors.ink },
-  leaveSub: { fontSize: 11, color: colors.muted, marginTop: 2, fontFamily: fonts.body },
 });

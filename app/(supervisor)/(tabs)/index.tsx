@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSupervisor } from '../../../src/lib/session';
 import { useAsync } from '../../../src/lib/useAsync';
@@ -12,18 +12,19 @@ import {
   fetchRoster,
   fetchTodaysEntries,
 } from '../../../src/lib/queries';
-import { ScreenBody, TopBar } from '../../../src/components/Screen';
-import { Card, EmptyState, Loader, Pill, Section, StatusStrip } from '../../../src/components/ui';
+import { EmptyState } from '../../../src/components/ui';
 import {
   CashAdvanceNoticeCard,
   PunchApprovalCard,
   RequestApprovalCard,
 } from '../../../src/components/approvals';
-import { colors, fonts, radius, type } from '../../../src/theme';
-import { initialsOf, longDate } from '../../../src/lib/format';
+import { longDate } from '../../../src/lib/format';
+import { useWebTheme } from '../../../src/web/webTheme';
+import { GlassCard, GlassPullScreen, MetricCard, WebPill, WebSection, WorkerCell } from '../../../src/web/webUi';
 
 export default function SupervisorHome() {
   const supervisor = useSupervisor();
+  const { palette } = useWebTheme();
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const { data, loading, reload } = useAsync(async () => {
@@ -89,134 +90,101 @@ export default function SupervisorHome() {
   const rosterPreview = (data?.roster ?? []).slice(0, 5);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.paper }}>
-      <TopBar label="Supervisor" />
-      <ScreenBody refreshing={loading} onRefresh={reload}>
-        <Text style={type.eyebrow}>{longDate()}</Text>
-        <Text style={type.greet}>Morning, {supervisor.full_name.split(' ')[0]}</Text>
-        <Text style={[type.subgreet, { marginBottom: 20 }]}>
-          {data?.roster.length ?? 0} worker{(data?.roster.length ?? 0) === 1 ? '' : 's'} under you
-        </Text>
+    <GlassPullScreen loading={loading} onRefresh={reload}>
+      <Text style={{ fontSize: 11, letterSpacing: 1, color: palette.muted, fontWeight: '700' }}>
+        {longDate().toUpperCase()}
+      </Text>
+      <Text style={{ fontSize: 22, fontWeight: '700', color: palette.text, marginTop: 3 }}>
+        Morning, {supervisor.full_name.split(' ')[0]}
+      </Text>
+      <Text style={{ fontSize: 13, color: palette.muted, marginTop: 2, marginBottom: 16 }}>
+        {data?.roster.length ?? 0} worker{(data?.roster.length ?? 0) === 1 ? '' : 's'} under you
+      </Text>
 
-        <StatusStrip
-          chips={[
-            { value: stats.presentToday, label: 'Present today', tone: 'ok' },
-            { value: stats.awaiting, label: 'Awaiting review', tone: 'pending' },
-            { value: stats.incomplete, label: 'Incomplete profile', tone: 'warn' },
-          ]}
-        />
+      <View style={{ flexDirection: 'row', gap: 9, marginBottom: 22 }}>
+        <MetricCard style={{ flex: 1, padding: 12 }} label="Present today" value={String(stats.presentToday)} trendPct={null} />
+        <MetricCard style={{ flex: 1, padding: 12 }} label="Awaiting review" value={String(stats.awaiting)} trendPct={null} />
+        <MetricCard style={{ flex: 1, padding: 12 }} label="Incomplete" value={String(stats.incomplete)} trendPct={null} />
+      </View>
 
-        {/* --------------------------- Pending punches -------------------- */}
-        <Section
-          title="Pending time punches"
-          link={data?.punches.length ? `${data.punches.length} total` : undefined}
-          onLinkPress={() => router.push('/(supervisor)/(tabs)/approvals')}
-        >
-          {loading && !data ? (
-            <Loader />
-          ) : punchPreview.length === 0 ? (
-            <EmptyState title="Nothing to review" body="New punches appear here as workers clock in." />
-          ) : (
-            punchPreview.map((e) => (
-              <PunchApprovalCard
-                key={e.id}
-                entry={e}
-                busy={busyId === e.id}
-                onDecide={(d) => handlePunch(e.id, d)}
-              />
-            ))
-          )}
-        </Section>
-
-        {/* ------------------------------- Requests ----------------------- */}
-        <Section
-          title="Requests"
-          link="See all"
-          onLinkPress={() => router.push('/(supervisor)/(tabs)/approvals')}
-        >
-          {requestPreview.length === 0 ? (
-            <EmptyState title="No open requests" body="Cash advances and leave filings land here." />
-          ) : (
-            requestPreview.map((item) =>
-              item.kind === 'advance' ? (
-                <CashAdvanceNoticeCard key={`a-${item.req.id}`} request={item.req} />
-              ) : (
-                <RequestApprovalCard
-                  key={`l-${item.req.id}`}
-                  request={item.req}
-                  busy={busyId === item.req.id}
-                  onDecide={(d, r) => handleLeave(item.req.id, d, r)}
-                />
-              )
-            )
-          )}
-        </Section>
-
-        {/* ----------------------------- Team roster ---------------------- */}
-        <Section
-          title="Team roster"
-          link="Add worker"
-          onLinkPress={() => router.push('/(supervisor)/register-worker')}
-        >
-          {rosterPreview.length === 0 ? (
-            <EmptyState
-              title="No workers yet"
-              body="Register your first worker to issue their login credentials."
+      {/* --------------------------- Pending punches -------------------- */}
+      <WebSection
+        title="Pending time punches"
+        link={data?.punches.length ? `${data.punches.length} total` : undefined}
+        onLinkPress={() => router.push('/(supervisor)/(tabs)/approvals')}
+      >
+        {loading && !data ? (
+          <Text style={{ color: palette.muted, textAlign: 'center', paddingVertical: 16 }}>Loading…</Text>
+        ) : punchPreview.length === 0 ? (
+          <EmptyState title="Nothing to review" body="New punches appear here as workers clock in." />
+        ) : (
+          punchPreview.map((e) => (
+            <PunchApprovalCard
+              key={e.id}
+              entry={e}
+              busy={busyId === e.id}
+              onDecide={(d) => handlePunch(e.id, d)}
             />
-          ) : (
-            <Card>
-              {rosterPreview.map((w, i) => {
-                const live = liveStatus.get(w.id);
-                const label =
-                  w.status !== 'complete' ? 'Incomplete' : live === 'in' ? 'In' : live === 'out' ? 'Out' : 'Off';
-                const tone =
-                  w.status !== 'complete' ? 'warn' : live === 'in' ? 'ok' : 'muted';
-                return (
-                  <Pressable
-                    key={w.id}
-                    onPress={() => router.push(`/(supervisor)/worker/${w.id}`)}
-                    style={[s.rosterRow, i === rosterPreview.length - 1 && s.rosterRowLast]}
-                  >
-                    <View style={s.rosterAvatar}>
-                      <Text style={s.rosterInitials}>{initialsOf(w.full_name)}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.rosterName}>{w.full_name}</Text>
-                      <Text style={s.rosterRole}>{w.phone || 'No phone on file'}</Text>
-                    </View>
-                    <Pill label={label} tone={tone} />
-                  </Pressable>
-                );
-              })}
-            </Card>
-          )}
-        </Section>
-      </ScreenBody>
-    </View>
+          ))
+        )}
+      </WebSection>
+
+      {/* ------------------------------- Requests ----------------------- */}
+      <WebSection title="Requests" link="See all" onLinkPress={() => router.push('/(supervisor)/(tabs)/approvals')}>
+        {requestPreview.length === 0 ? (
+          <EmptyState title="No open requests" body="Cash advances and leave filings land here." />
+        ) : (
+          requestPreview.map((item) =>
+            item.kind === 'advance' ? (
+              <CashAdvanceNoticeCard key={`a-${item.req.id}`} request={item.req} />
+            ) : (
+              <RequestApprovalCard
+                key={`l-${item.req.id}`}
+                request={item.req}
+                busy={busyId === item.req.id}
+                onDecide={(d, r) => handleLeave(item.req.id, d, r)}
+              />
+            )
+          )
+        )}
+      </WebSection>
+
+      {/* ----------------------------- Team roster ---------------------- */}
+      <WebSection title="Team roster" link="Add worker" onLinkPress={() => router.push('/(supervisor)/register-worker')}>
+        {rosterPreview.length === 0 ? (
+          <EmptyState title="No workers yet" body="Register your first worker to issue their login credentials." />
+        ) : (
+          <GlassCard style={{ padding: 0 }}>
+            {rosterPreview.map((w, i) => {
+              const live = liveStatus.get(w.id);
+              const label = w.status !== 'complete' ? 'Incomplete' : live === 'in' ? 'In' : live === 'out' ? 'Out' : 'Off';
+              const tone: 'bad' | 'good' | 'muted' = w.status !== 'complete' ? 'bad' : live === 'in' ? 'good' : 'muted';
+              return (
+                <Pressable
+                  key={w.id}
+                  onPress={() => router.push(`/(supervisor)/worker/${w.id}`)}
+                  style={({ pressed }) => [
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: 13,
+                      borderTopWidth: i === 0 ? 0 : 1,
+                      borderTopColor: palette.border,
+                    },
+                    pressed && { backgroundColor: palette.hover },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <WorkerCell name={w.full_name} sub={w.phone || 'No phone on file'} />
+                  </View>
+                  <WebPill label={label} tone={tone} />
+                </Pressable>
+              );
+            })}
+          </GlassCard>
+        )}
+      </WebSection>
+    </GlassPullScreen>
   );
 }
-
-const s = StyleSheet.create({
-  rosterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-  },
-  rosterRowLast: { borderBottomWidth: 0 },
-  rosterAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
-    backgroundColor: colors.paper,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rosterInitials: { fontSize: 12, fontFamily: fonts.bodyBold, color: colors.steel },
-  rosterName: { fontSize: 13, fontFamily: fonts.bodyBold, color: colors.ink },
-  rosterRole: { fontSize: 11, color: colors.muted, fontFamily: fonts.body },
-});
