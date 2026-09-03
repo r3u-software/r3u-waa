@@ -56,7 +56,7 @@ import { colors, fonts, radius, spacing, toneForStatus, type } from '../../src/t
 import { cutoffFor, hours, periodLabel, peso, toDateColumn } from '../../src/lib/format';
 import { WebShell } from '../../src/web/WebShell';
 import { useWebTheme, webOnlyStyle } from '../../src/web/webTheme';
-import { Chip, GlassButton, GlassOutlineButton, WebPageHeader, WebSection } from '../../src/web/webUi';
+import { Chip, GlassButton, GlassOutlineButton, WebPageHeader, WebPill, WebSection } from '../../src/web/webUi';
 
 /** The lifecycle, in order. `paid` is handled separately — it needs proofs first. */
 const NEXT_STATUS: Record<PayrollRunStatus, PayrollRunStatus | null> = {
@@ -84,6 +84,32 @@ const STATUS_ACTION: Record<string, string> = {
 export default function HrPayroll() {
   const hrAdmin = useHrAdmin();
   const { palette } = useWebTheme();
+  /** Grid-specific styling — the dense worker-by-worker table this screen's
+   * main data lives in used to be plain white (`colors.paper`) even after
+   * everything around it went glass. Kept separate from the static `s`
+   * StyleSheet below (which still covers layout-only concerns and the
+   * deliberately-left-white run-summary/breakdown/modal cards) because these
+   * few keys need to repaint with the live theme. */
+  const gs = useMemo(
+    () => ({
+      row: {
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: palette.border,
+      },
+      headRow: { backgroundColor: palette.hover },
+      subtotalRow: { backgroundColor: palette.hover, borderBottomWidth: 0 },
+      headText: { fontSize: 9.5, letterSpacing: 0.5, color: palette.muted, fontWeight: '700' as const },
+      name: { fontSize: 12.5, fontWeight: '700' as const, color: palette.text },
+      sub: { fontSize: 10.5, color: palette.muted },
+      body: { fontSize: 12, color: palette.text, fontVariant: ['tabular-nums'] as ('tabular-nums')[] },
+      strong: { fontWeight: '700' as const, color: palette.text, fontVariant: ['tabular-nums'] as ('tabular-nums')[] },
+    }),
+    [palette]
+  );
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -375,26 +401,26 @@ export default function HrPayroll() {
                 ) : (
                   groups.map((g) => (
                     <WebSection key={g.site} title={g.site}>
-                      <Card style={{ padding: 0, overflow: 'hidden' }}>
+                      <View style={[s.tableWrap, { borderColor: palette.border, backgroundColor: palette.panelSolid }]}>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                           <View>
-                            <View style={[s.row, s.headRow]}>
-                              <Text style={[s.cell, s.cWorker, s.headText]}>Worker</Text>
-                              <Text style={[s.cell, s.cNum, s.headText]}>Days</Text>
-                              <Text style={[s.cell, s.cNum, s.headText]}>Hours</Text>
-                              <Text style={[s.cell, s.cNum, s.headText]}>OT hrs</Text>
-                              <Text style={[s.cell, s.cNum, s.headText]}>Paid lv</Text>
-                              <Text style={[s.cell, s.cNum, s.headText]}>Unpaid lv</Text>
-                              <Text style={[s.cell, s.cMoney, s.headText]}>Regular</Text>
-                              <Text style={[s.cell, s.cMoney, s.headText]}>Overtime</Text>
-                              <Text style={[s.cell, s.cMoney, s.headText]}>Leave pay</Text>
-                              <Text style={[s.cell, s.cMoney, s.headText]}>Gross</Text>
-                              <Text style={[s.cell, s.cMoney, s.headText]}>Cash adv.</Text>
-                              <Text style={[s.cell, s.cMoney, s.headText]}>Statutory</Text>
-                              <Text style={[s.cell, s.cMoney, s.headText]}>Net pay</Text>
-                              <Text style={[s.cell, s.cStatus, s.headText]}>Run status</Text>
-                              <Text style={[s.cell, s.cProof, s.headText]}>Proof</Text>
-                              <Text style={[s.cell, s.cProof, s.headText]}>Flags</Text>
+                            <View style={[gs.row, gs.headRow]}>
+                              <Text style={[s.cell, s.cWorker, gs.headText]}>Worker</Text>
+                              <Text style={[s.cell, s.cNum, gs.headText]}>Days</Text>
+                              <Text style={[s.cell, s.cNum, gs.headText]}>Hours</Text>
+                              <Text style={[s.cell, s.cNum, gs.headText]}>OT hrs</Text>
+                              <Text style={[s.cell, s.cNum, gs.headText]}>Paid lv</Text>
+                              <Text style={[s.cell, s.cNum, gs.headText]}>Unpaid lv</Text>
+                              <Text style={[s.cell, s.cMoney, gs.headText]}>Regular</Text>
+                              <Text style={[s.cell, s.cMoney, gs.headText]}>Overtime</Text>
+                              <Text style={[s.cell, s.cMoney, gs.headText]}>Leave pay</Text>
+                              <Text style={[s.cell, s.cMoney, gs.headText]}>Gross</Text>
+                              <Text style={[s.cell, s.cMoney, gs.headText]}>Cash adv.</Text>
+                              <Text style={[s.cell, s.cMoney, gs.headText]}>Statutory</Text>
+                              <Text style={[s.cell, s.cMoney, gs.headText]}>Net pay</Text>
+                              <Text style={[s.cell, s.cStatus, gs.headText]}>Run status</Text>
+                              <Text style={[s.cell, s.cProof, gs.headText]}>Proof</Text>
+                              <Text style={[s.cell, s.cProof, gs.headText]}>Flags</Text>
                             </View>
 
                             {g.slips.map((p, i) => {
@@ -408,70 +434,70 @@ export default function HrPayroll() {
                                   key={p.id}
                                   onPress={() => setExpanded(expanded === p.id ? null : p.id)}
                                   style={({ pressed }) => [
-                                    s.row,
+                                    gs.row,
                                     i === g.slips.length - 1 && s.rowLast,
-                                    pressed && { backgroundColor: colors.paper },
+                                    pressed && { backgroundColor: palette.hover },
                                   ]}
                                 >
                                   <View style={[s.cell, s.cWorker]}>
-                                    <Text style={s.name} numberOfLines={1}>
+                                    <Text style={gs.name} numberOfLines={1}>
                                       {p.worker?.full_name ?? 'Worker'}
                                     </Text>
-                                    <Text style={s.sub} numberOfLines={1}>
+                                    <Text style={gs.sub} numberOfLines={1}>
                                       {p.worker?.position || 'No position'}
                                     </Text>
                                   </View>
-                                  <Text style={[s.cell, s.cNum, s.body]}>
+                                  <Text style={[s.cell, s.cNum, gs.body]}>
                                     {estimateDays(p.worked_hours, data!.settings?.standard_hours_per_day)}
                                   </Text>
-                                  <Text style={[s.cell, s.cNum, s.body]}>
+                                  <Text style={[s.cell, s.cNum, gs.body]}>
                                     {Number(p.worked_hours).toFixed(2)}
                                   </Text>
-                                  <Text style={[s.cell, s.cNum, s.body]}>
+                                  <Text style={[s.cell, s.cNum, gs.body]}>
                                     {Number(p.overtime_hours).toFixed(2)}
                                   </Text>
-                                  <Text style={[s.cell, s.cNum, s.body]}>
+                                  <Text style={[s.cell, s.cNum, gs.body]}>
                                     {paidLeaveDays(p.paid_leave_hours, data!.settings?.standard_hours_per_day)}
                                   </Text>
-                                  <Text style={[s.cell, s.cNum, s.body]}>
+                                  <Text style={[s.cell, s.cNum, gs.body]}>
                                     {Number(p.unpaid_leave_days)}
                                   </Text>
-                                  <Text style={[s.cell, s.cMoney, s.body]}>
+                                  <Text style={[s.cell, s.cMoney, gs.body]}>
                                     {peso(p.regular_pay)}
                                   </Text>
-                                  <Text style={[s.cell, s.cMoney, s.body]}>
+                                  <Text style={[s.cell, s.cMoney, gs.body]}>
                                     {peso(p.overtime_pay)}
                                   </Text>
-                                  <Text style={[s.cell, s.cMoney, s.body]}>{peso(p.leave_pay)}</Text>
-                                  <Text style={[s.cell, s.cMoney, s.strong]}>
+                                  <Text style={[s.cell, s.cMoney, gs.body]}>{peso(p.leave_pay)}</Text>
+                                  <Text style={[s.cell, s.cMoney, gs.strong]}>
                                     {peso(p.gross_pay)}
                                   </Text>
-                                  <Text style={[s.cell, s.cMoney, s.body]}>
+                                  <Text style={[s.cell, s.cMoney, gs.body]}>
                                     {peso(p.cash_advance_deducted)}
                                   </Text>
-                                  <Text style={[s.cell, s.cMoney, s.body]}>{peso(statutory)}</Text>
-                                  <Text style={[s.cell, s.cMoney, s.strong]}>{peso(p.net_pay)}</Text>
-                                  <Text style={[s.cell, s.cStatus, s.sub]}>{run.status}</Text>
+                                  <Text style={[s.cell, s.cMoney, gs.body]}>{peso(statutory)}</Text>
+                                  <Text style={[s.cell, s.cMoney, gs.strong]}>{peso(p.net_pay)}</Text>
+                                  <Text style={[s.cell, s.cStatus, gs.sub]}>{run.status}</Text>
                                   <View style={[s.cell, s.cProof]}>
                                     {p.proof_url ? (
-                                      <Pill label="Yes" tone="ok" />
+                                      <WebPill label="Yes" tone="good" />
                                     ) : (
-                                      <Pill label="—" tone="muted" />
+                                      <WebPill label="—" tone="muted" />
                                     )}
                                   </View>
                                   <View style={[s.cell, s.cProof]}>
                                     {data!.flags.get(p.worker_id) ? (
-                                      <Pill label="Overlap" tone="warn" />
+                                      <WebPill label="Overlap" tone="bad" />
                                     ) : (
-                                      <Text style={s.sub}>—</Text>
+                                      <Text style={gs.sub}>—</Text>
                                     )}
                                   </View>
                                 </Pressable>
                               );
                             })}
 
-                            <View style={[s.row, s.subtotalRow]}>
-                              <Text style={[s.cell, s.cWorker, s.strong]}>{g.site} subtotal</Text>
+                            <View style={[gs.row, gs.subtotalRow]}>
+                              <Text style={[s.cell, s.cWorker, gs.strong]}>{g.site} subtotal</Text>
                               <Text style={[s.cell, s.cNum]} />
                               <Text style={[s.cell, s.cNum]} />
                               <Text style={[s.cell, s.cNum]} />
@@ -480,17 +506,17 @@ export default function HrPayroll() {
                               <Text style={[s.cell, s.cMoney]} />
                               <Text style={[s.cell, s.cMoney]} />
                               <Text style={[s.cell, s.cMoney]} />
-                              <Text style={[s.cell, s.cMoney, s.strong]}>{peso(g.gross)}</Text>
+                              <Text style={[s.cell, s.cMoney, gs.strong]}>{peso(g.gross)}</Text>
                               <Text style={[s.cell, s.cMoney]} />
                               <Text style={[s.cell, s.cMoney]} />
-                              <Text style={[s.cell, s.cMoney, s.strong]}>{peso(g.subtotal)}</Text>
+                              <Text style={[s.cell, s.cMoney, gs.strong]}>{peso(g.subtotal)}</Text>
                               <Text style={[s.cell, s.cStatus]} />
                               <Text style={[s.cell, s.cProof]} />
                               <Text style={[s.cell, s.cProof]} />
                             </View>
                           </View>
                         </ScrollView>
-                      </Card>
+                      </View>
 
                       {/* Expanded breakdown for whichever row was tapped. */}
                       {g.slips
@@ -714,28 +740,14 @@ const s = StyleSheet.create({
   runDone: { fontSize: 11.5, color: colors.ok, marginTop: 12, fontFamily: fonts.bodySemi },
   runWarn: { fontSize: 11.5, color: colors.warn, marginTop: 10, lineHeight: 17, fontFamily: fonts.body },
 
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-  },
+  tableWrap: { borderWidth: 1, borderRadius: 15, overflow: 'hidden' },
   rowLast: { borderBottomWidth: 0 },
-  headRow: { backgroundColor: colors.paper },
-  subtotalRow: { backgroundColor: colors.paper, borderBottomWidth: 0 },
-  headText: { fontSize: 9.5, letterSpacing: 0.5, color: colors.muted, fontFamily: fonts.bodyBold },
   cell: { paddingRight: 12 },
   cWorker: { width: 140 },
   cNum: { width: 54, textAlign: 'right' },
   cMoney: { width: 82, textAlign: 'right' },
   cStatus: { width: 74 },
   cProof: { width: 58 },
-  name: { fontSize: 12.5, fontFamily: fonts.bodySemi, color: colors.ink },
-  sub: { fontSize: 10.5, color: colors.muted, fontFamily: fonts.body },
-  body: { fontSize: 12, color: colors.ink, fontFamily: fonts.body },
-  strong: { fontFamily: fonts.bodyBold, color: colors.ink },
 
   breakdown: { marginTop: 10, backgroundColor: colors.paper, borderColor: colors.line },
   breakdownTitle: { fontSize: 14, fontFamily: fonts.bodyBold, color: colors.ink },
@@ -744,6 +756,7 @@ const s = StyleSheet.create({
   lineLabel: { fontSize: 12.5, color: colors.ink, fontFamily: fonts.body },
   lineNote: { fontSize: 10.5, color: colors.muted, fontFamily: fonts.body },
   lineAmount: { fontSize: 12.5, color: colors.ink, fontFamily: fonts.bodySemi },
+  strong: { fontFamily: fonts.bodyBold, color: colors.ink },
   rule: { height: 1, backgroundColor: colors.line, marginVertical: 6 },
   proofOk: { fontSize: 11.5, color: colors.ok, marginTop: 12, fontFamily: fonts.bodySemi },
 

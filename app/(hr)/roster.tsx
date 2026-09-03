@@ -14,23 +14,27 @@
  * a theme-aware color instead of `colors.*`.
  */
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useHrAdmin } from '../../src/lib/session';
 import { useAsync } from '../../src/lib/useAsync';
 import { fetchAllWorkers, fetchProjects, fetchSupervisors } from '../../src/lib/queries';
-import {
-  Card,
-  EmptyState,
-  Loader,
-  Pill,
-  StatusStrip,
-} from '../../src/components/ui';
-import { colors, fonts, radius, toneForStatus } from '../../src/theme';
+import { EmptyState, Loader, StatusStrip } from '../../src/components/ui';
+import { toneForStatus } from '../../src/theme';
 import { initialsOf } from '../../src/lib/format';
 import { WebShell } from '../../src/web/WebShell';
 import { useWebTheme } from '../../src/web/webTheme';
-import { Chip, GlassButton, WebPageHeader, WebSection } from '../../src/web/webUi';
+import {
+  Chip,
+  DataRow,
+  DataTable,
+  GlassButton,
+  WebPageHeader,
+  WebPill,
+  WebSection,
+  webToneFor,
+} from '../../src/web/webUi';
+import { LinearGradient } from 'expo-linear-gradient';
 
 /**
  * There is no "which workers report to which supervisor" table; the grouping
@@ -119,37 +123,32 @@ export default function HrRoster() {
           body="Register a supervisor first — supervisors register their own workers."
         />
       ) : (
-        groups.map((g) => (
-          <WebSection key={g.key} title={g.label}>
-            <Card>
-              {g.workers.map((w, i) => (
-                <Pressable
-                  key={w.id}
-                  onPress={() => router.push(`/(hr)/worker/${w.id}`)}
-                  style={({ pressed }) => [
-                    s.row,
-                    i === g.workers.length - 1 && s.rowLast,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                >
-                  <View style={s.avatar}>
-                    <Text style={s.initials}>{initialsOf(w.full_name)}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.name}>{w.full_name}</Text>
-                    <Text style={s.sub}>
-                      {w.position || 'No position'} · {w.phone || 'no phone'}
-                    </Text>
-                  </View>
-                  <Pill
-                    label={w.employment_status}
-                    tone={toneForStatus(w.employment_status)}
+        groups.map((g) => {
+          const cols = [
+            { key: 'worker', label: 'Worker', flex: 2 },
+            { key: 'phone', label: 'Phone', flex: 1 },
+            { key: 'status', label: 'Status', flex: 1, align: 'right' as const },
+          ];
+          return (
+            <WebSection key={g.key} title={g.label}>
+              <DataTable columns={cols}>
+                {g.workers.map((w, i) => (
+                  <DataRow
+                    key={w.id}
+                    index={i}
+                    columns={cols}
+                    onPress={() => router.push(`/(hr)/worker/${w.id}`)}
+                    values={{
+                      worker: <WorkerCell name={w.full_name} sub={w.position || 'No position'} />,
+                      phone: w.phone || '—',
+                      status: <WebPill label={w.employment_status} tone={webToneFor(toneForStatus(w.employment_status))} />,
+                    }}
                   />
-                </Pressable>
-              ))}
-            </Card>
-          </WebSection>
-        ))
+                ))}
+              </DataTable>
+            </WebSection>
+          );
+        })
       )}
 
       {(data?.supervisors.length ?? 0) === 0 ? (
@@ -162,28 +161,35 @@ export default function HrRoster() {
   );
 }
 
+/** The `.tname` pattern from the reference dashboard — a gradient avatar
+ * initials mark, a bold name, a muted subtitle — used for every "who" column
+ * across the redesigned data tables (Roster here; Payroll grid reuses it). */
+export function WorkerCell({ name, sub }: { name: string; sub?: string }) {
+  const { palette } = useWebTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <LinearGradient
+        colors={[palette.accent, palette.accent2]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 11 }}>{initialsOf(name)}</Text>
+      </LinearGradient>
+      <View style={{ minWidth: 0 }}>
+        <Text style={{ fontSize: 12.5, fontWeight: '700', color: palette.text }} numberOfLines={1}>
+          {name}
+        </Text>
+        {sub ? (
+          <Text style={{ fontSize: 10.5, color: palette.muted }} numberOfLines={1}>
+            {sub}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 18, flexWrap: 'wrap' },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-  },
-  rowLast: { borderBottomWidth: 0 },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
-    backgroundColor: colors.paper,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initials: { fontSize: 12, fontFamily: fonts.bodyBold, color: colors.steel },
-  name: { fontSize: 13, fontFamily: fonts.bodyBold, color: colors.ink },
-  sub: { fontSize: 11, color: colors.muted, fontFamily: fonts.body },
 });

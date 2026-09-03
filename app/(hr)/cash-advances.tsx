@@ -14,7 +14,7 @@
  * single `mark_paid_out` action.
  */
 import React, { useState } from 'react';
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, Text, View } from 'react-native';
 import { useHrAdmin } from '../../src/lib/session';
 import { useAsync } from '../../src/lib/useAsync';
 import {
@@ -26,20 +26,23 @@ import {
 import type { WaaCashAdvanceDetailed } from '../../src/lib/types';
 import { captureDocument, pickImageFromLibrary } from '../../src/lib/capture';
 import { uploadToPath } from '../../src/lib/storage';
-import {
-  ApproveRow,
-  Card,
-  EmptyState,
-  ErrorNote,
-  Field,
-  Loader,
-  Pill,
-} from '../../src/components/ui';
+import { EmptyState, Loader } from '../../src/components/ui';
 import { SignedImage } from '../../src/components/SignedImage';
-import { colors, fonts, spacing, toneForStatus, type } from '../../src/theme';
+import { toneForStatus } from '../../src/theme';
 import { peso, relativeStamp } from '../../src/lib/format';
 import { WebShell } from '../../src/web/WebShell';
-import { GlassButton, GlassOutlineButton, WebPageHeader, WebSection } from '../../src/web/webUi';
+import { useWebTheme } from '../../src/web/webTheme';
+import {
+  GlassButton,
+  GlassCard,
+  GlassErrorBanner,
+  GlassField,
+  GlassOutlineButton,
+  WebPageHeader,
+  WebPill,
+  WebSection,
+  webToneFor,
+} from '../../src/web/webUi';
 
 /**
  * Cash advances, end to end: requested -> approved -> paid out -> settled.
@@ -53,6 +56,7 @@ import { GlassButton, GlassOutlineButton, WebPageHeader, WebSection } from '../.
  */
 export default function HrCashAdvances() {
   const hrAdmin = useHrAdmin();
+  const { palette } = useWebTheme();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [declining, setDeclining] = useState<WaaCashAdvanceDetailed | null>(null);
@@ -109,7 +113,7 @@ export default function HrCashAdvances() {
   return (
     <WebShell active="cash-advances" title="Cash advances" subtitle="Requested → approved → paid out → settled">
       <WebPageHeader eyebrow="Workforce" title="Cash advances" sub="Every request, on every site, from filing to settlement." />
-      {error ? <ErrorNote message={error} /> : null}
+      {error ? <GlassErrorBanner message={error} /> : null}
 
       <WebSection title="Waiting on you">
         {loading && !data ? (
@@ -121,28 +125,37 @@ export default function HrCashAdvances() {
           />
         ) : (
           pending.map((a) => (
-            <Card key={a.id}>
-              <View style={s.rowTop}>
+            <GlassCard key={a.id} style={{ marginBottom: 9 }}>
+              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={type.cardTitle}>
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>
                     {a.money ? peso(a.money.amount) : 'Amount unavailable'}
                   </Text>
-                  <Text style={type.cardSub}>
+                  <Text style={{ fontSize: 12, color: palette.muted, marginTop: 2 }}>
                     {a.worker?.full_name ?? 'Worker'} · {a.reason || 'No reason given'}
                   </Text>
-                  <Text style={s.stamp}>Filed {relativeStamp(a.created_at)}</Text>
+                  <Text style={{ fontSize: 11, color: palette.muted, marginTop: 3 }}>Filed {relativeStamp(a.created_at)}</Text>
                 </View>
-                <Pill label="Requested" tone="pending" />
+                <WebPill label="Requested" tone="info" />
               </View>
-              <ApproveRow
-                busy={busyId === a.id}
-                onApprove={() => run(a.id, () => hrDecideCashAdvance(a.id, 'approved', hrAdmin.id))}
-                onDecline={() => {
-                  setRemarks('');
-                  setDeclining(a);
-                }}
-              />
-            </Card>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                <GlassOutlineButton
+                  label="Decline"
+                  onPress={() => {
+                    setRemarks('');
+                    setDeclining(a);
+                  }}
+                  style={{ flex: 1 }}
+                />
+                <GlassButton
+                  label={busyId === a.id ? 'Working…' : 'Approve'}
+                  tone="good"
+                  onPress={() => run(a.id, () => hrDecideCashAdvance(a.id, 'approved', hrAdmin.id))}
+                  loading={busyId === a.id}
+                  style={{ flex: 1 }}
+                />
+              </View>
+            </GlassCard>
           ))
         )}
       </WebSection>
@@ -155,21 +168,20 @@ export default function HrCashAdvances() {
           />
         ) : (
           approved.map((a) => (
-            <Card key={a.id}>
-              <View style={s.rowTop}>
+            <GlassCard key={a.id} style={{ marginBottom: 9 }}>
+              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={type.cardTitle}>
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>
                     {a.money ? peso(a.money.amount) : 'Amount unavailable'}
                   </Text>
-                  <Text style={type.cardSub}>
+                  <Text style={{ fontSize: 12, color: palette.muted, marginTop: 2 }}>
                     {a.worker?.full_name ?? 'Worker'} · {a.reason || 'No reason given'}
                   </Text>
                 </View>
-                <Pill label="Approved" tone="ok" />
+                <WebPill label="Approved" tone="good" />
               </View>
-              <Text style={s.note}>
-                Attaching proof of the transfer marks this paid out. The database refuses the status
-                change without one.
+              <Text style={{ fontSize: 11.5, color: palette.muted, lineHeight: 17, marginTop: 10 }}>
+                Attaching proof of the transfer marks this paid out. The database refuses the status change without one.
               </Text>
               <GlassButton
                 label={busyId === a.id ? 'Working…' : 'Attach proof & mark paid out'}
@@ -178,7 +190,7 @@ export default function HrCashAdvances() {
                 tone="good"
                 style={{ marginTop: 12 }}
               />
-            </Card>
+            </GlassCard>
           ))
         )}
       </WebSection>
@@ -188,34 +200,34 @@ export default function HrCashAdvances() {
           <EmptyState title="Nothing yet" />
         ) : (
           history.map((a) => (
-            <Card key={a.id}>
-              <View style={s.rowTop}>
+            <GlassCard key={a.id} style={{ marginBottom: 9 }}>
+              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={type.cardTitle}>
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>
                     {a.money ? peso(a.money.amount) : 'Amount unavailable'}
                   </Text>
-                  <Text style={type.cardSub}>
+                  <Text style={{ fontSize: 12, color: palette.muted, marginTop: 2 }}>
                     {a.worker?.full_name ?? 'Worker'} · {a.reason || 'No reason given'}
                   </Text>
                   {a.status === 'declined' && a.money?.decline_remarks ? (
-                    <Text style={s.stamp}>Declined: {a.money.decline_remarks}</Text>
+                    <Text style={{ fontSize: 11, color: palette.muted, marginTop: 3 }}>Declined: {a.money.decline_remarks}</Text>
                   ) : a.status === 'settled' ? (
-                    <Text style={s.stamp}>Deducted in a payroll run.</Text>
+                    <Text style={{ fontSize: 11, color: palette.muted, marginTop: 3 }}>Deducted in a payroll run.</Text>
                   ) : a.money?.paid_out_at ? (
-                    <Text style={s.stamp}>
+                    <Text style={{ fontSize: 11, color: palette.muted, marginTop: 3 }}>
                       Released {relativeStamp(a.money.paid_out_at)} · awaiting deduction
                     </Text>
                   ) : null}
                 </View>
-                <Pill label={a.status.replace('_', ' ')} tone={toneForStatus(a.status)} />
+                <WebPill label={a.status.replace('_', ' ')} tone={webToneFor(toneForStatus(a.status))} />
               </View>
               {a.money?.proof_url ? (
-                <View style={s.proofRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 }}>
                   <SignedImage bucket="waa-payroll-proofs" path={a.money.proof_url} size={44} />
-                  <Text style={s.proofText}>Proof of payment on file</Text>
+                  <Text style={{ fontSize: 12, color: palette.good, fontWeight: '700' }}>Proof of payment on file</Text>
                 </View>
               ) : null}
-            </Card>
+            </GlassCard>
           ))
         )}
       </WebSection>
@@ -227,19 +239,16 @@ export default function HrCashAdvances() {
         animationType="slide"
         onRequestClose={() => setDeclining(null)}
       >
-        <Pressable style={s.backdrop} onPress={() => setDeclining(null)}>
-          <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={s.sheetTitle}>Decline this advance?</Text>
-            <Text style={s.sheetSub}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }} onPress={() => setDeclining(null)}>
+          <Pressable
+            style={{ backgroundColor: palette.panelSolid, borderWidth: 1, borderColor: palette.border, borderBottomWidth: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 22, paddingBottom: 40 }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text, marginBottom: 4 }}>Decline this advance?</Text>
+            <Text style={{ fontSize: 12.5, color: palette.muted, lineHeight: 18, marginBottom: 16 }}>
               Your remarks are shown to {declining?.worker?.full_name ?? 'the worker'}.
             </Text>
-            <Field
-              label="Remarks (optional)"
-              value={remarks}
-              onChangeText={setRemarks}
-              placeholder="Why are you declining?"
-              multiline
-            />
+            <GlassField label="Remarks (optional)" value={remarks} onChangeText={setRemarks} placeholder="Why are you declining?" multiline />
             <GlassButton
               label="Decline request"
               tone="warn"
@@ -268,33 +277,3 @@ export default function HrCashAdvances() {
     </WebShell>
   );
 }
-
-const s = StyleSheet.create({
-  rowTop: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  stamp: { fontSize: 11, color: colors.muted, marginTop: 3, fontFamily: fonts.body },
-  note: { fontSize: 11.5, color: colors.muted, lineHeight: 17, marginTop: 10, fontFamily: fonts.body },
-  proofRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
-  proofText: { fontSize: 12, color: colors.ok, fontFamily: fonts.bodySemi },
-  backdrop: { flex: 1, backgroundColor: 'rgba(28,27,24,0.5)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colors.paper,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    padding: spacing.xl,
-    paddingBottom: 40,
-  },
-  sheetTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.ink,
-    marginBottom: 4,
-  },
-  sheetSub: {
-    fontSize: 12.5,
-    color: colors.muted,
-    marginBottom: spacing.lg,
-    lineHeight: 18,
-    fontFamily: fonts.body,
-  },
-});

@@ -639,7 +639,16 @@ export function DataRow({
       {...(onPress ? { onPress, style: ({ pressed }: { pressed: boolean }) => [base, pressed && { backgroundColor: palette.hover }] } : { style: base })}
     >
       {columns.map((c) => (
-        <View key={c.key} style={{ flex: c.flex ?? 1, width: c.width, paddingHorizontal: 8, justifyContent: 'center' }}>
+        <View
+          key={c.key}
+          style={{
+            flex: c.flex ?? 1,
+            width: c.width,
+            paddingHorizontal: 8,
+            justifyContent: 'center',
+            alignItems: c.align === 'right' ? 'flex-end' : 'flex-start',
+          }}
+        >
           {typeof values[c.key] === 'string' || typeof values[c.key] === 'number' ? (
             <Text
               style={{
