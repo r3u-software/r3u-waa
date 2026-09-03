@@ -107,9 +107,23 @@ export async function fetchWorkerLeaveRequests(workerId: string): Promise<WaaLea
   return unwrap<WaaLeaveRequest[]>(res as never);
 }
 
-/** Records a punch. Always lands as `pending` — the DB default. */
+/**
+ * Records a punch. Always lands as `pending` — the DB default.
+ *
+ * `company_id` is required here even though `worker_id` alone identifies the
+ * worker unambiguously: `waa_time_entries_insert_own`'s RLS `WITH CHECK` is
+ * `company_id = waa_current_company_id() AND worker_id = waa_current_worker_id()`,
+ * and the column is `NOT NULL` with no default and no populating trigger. Omit
+ * it and Postgres tries to insert NULL for it, which makes that AND evaluate
+ * to NULL (not true) under three-valued logic — the insert is rejected as an
+ * RLS violation rather than the (more honest) not-null violation it actually
+ * is. Found live: every punch was failing this way after `company_id` was
+ * added to this table in the multi-tenant retrofit, because this call site
+ * was never updated to send it.
+ */
 export async function insertTimeEntry(input: {
   worker_id: string;
+  company_id: string;
   project_id: string;
   type: 'in' | 'out';
   selfie_url: string | null;
@@ -147,8 +161,12 @@ export async function submitCashAdvance(amount: number, reason: string): Promise
  * `receipt_url`, or an RPC), which is out of scope for this app-side work.
  */
 
+/** Same missing-`company_id` bug as `insertTimeEntry` above, and same fix —
+ * `waa_lr_insert_own`'s RLS WITH CHECK needs it, the column is NOT NULL with
+ * no default, and this call site never sent it. */
 export async function submitLeaveRequest(input: {
   worker_id: string;
+  company_id: string;
   leave_type: string;
   date_from: string;
   date_to: string;

@@ -47,6 +47,7 @@ export default function LeaveScreen() {
     try {
       await submitLeaveRequest({
         worker_id: worker.id,
+        company_id: worker.company_id,
         leave_type: leaveType,
         date_from: toDateColumn(from),
         date_to: toDateColumn(to),

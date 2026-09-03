@@ -91,6 +91,7 @@ export default function PunchScreen() {
 
       await insertTimeEntry({
         worker_id: worker.id,
+        company_id: worker.company_id,
         project_id: projectId,
         type: punchType,
         selfie_url: selfiePath,
