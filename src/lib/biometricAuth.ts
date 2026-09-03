@@ -101,17 +101,31 @@ export async function authenticateWithBiometrics(promptMessage: string): Promise
   }
 }
 
-/** Called once, right after a normal password sign-in succeeds, if the
- * person opted in. Overwrites whatever record was there before — a device
- * only ever remembers the one most-recently-signed-in account, which is the
- * one thing "Continue as …" should ever offer. */
-export async function saveBiometricSession(record: BiometricRecord): Promise<void> {
-  if (!biometricLoginSupported()) return;
+/**
+ * Overwrites whatever record was there before — a device only ever
+ * remembers the one most-recently-signed-in account, which is the one
+ * thing "Continue as …" should ever offer.
+ *
+ * Returns whether the write actually landed. A real report from testing:
+ * the toggle would show "on" right after flipping it, then read back "off"
+ * the next time Profile was opened — this used to swallow a failed
+ * `SecureStore.setItemAsync` silently and report success regardless, so
+ * `enableBiometricLogin` had no way to know the write hadn't really stuck.
+ * Now it reads the value back and compares, which catches that case (and
+ * any other silent Keystore/Keychain failure) instead of reporting success
+ * on faith.
+ */
+export async function saveBiometricSession(record: BiometricRecord): Promise<boolean> {
+  if (!biometricLoginSupported()) return false;
+  const payload = JSON.stringify(record);
   try {
-    await SecureStore.setItemAsync(RECORD_KEY, JSON.stringify(record));
+    await SecureStore.setItemAsync(RECORD_KEY, payload);
+    const readBack = await SecureStore.getItemAsync(RECORD_KEY);
+    return readBack === payload;
   } catch {
     // Keychain/Keystore unavailable for some reason — the person just gets
     // asked for their password again next time, same as if they'd declined.
+    return false;
   }
 }
 
@@ -146,8 +160,9 @@ export async function enableBiometricLogin(identifierLabel: string): Promise<boo
   const { data } = await supabase.auth.getSession();
   const refreshToken = data.session?.refresh_token;
   if (!refreshToken) return false;
-  await saveBiometricSession({ identifierLabel, refreshToken });
-  return true;
+  // Whatever saveBiometricSession reports is the truth now — see its own
+  // doc comment for why this used to report success unconditionally.
+  return saveBiometricSession({ identifierLabel, refreshToken });
 }
 
 /** Forgets this device. Called from the explicit "Sign out" button (not the

@@ -43,13 +43,22 @@ import { AuthShell, GlassButton, GlassErrorBanner, GlassField, GlassFootnote } f
  * toggle (`BiometricToggle`, `src/web/webUi.tsx`) now, not offered here —
  * "it should ask for the first time login only. not always. better dont
  * ask, it should be a toggle." This screen only ever *reads* whatever was
- * already turned on there: three tappable icons (Face ID / fingerprint /
- * phone passcode) shown only once a record exists, each icon shown only if
- * the device actually reports that capability. All three call the same
- * `authenticateAsync()` under the hood — neither platform lets an app force
- * "face only" or "fingerprint only" out of the one system prompt, so the
- * icons are honest about *availability*, not independent code paths (see
- * `supportedBiometricTypes()`'s doc comment).
+ * already turned on there: a row of icons (Face ID and/or fingerprint,
+ * whichever the device actually reports enrolled) shown once a record
+ * exists, all wired to the same `signInWithBiometrics` handler.
+ *
+ * There is deliberately no separate "phone passcode" tap target any more —
+ * a real report from testing caught why: neither iOS's nor Android's system
+ * biometric prompt lets an app request "show only the passcode entry,
+ * skip biometric" — tapping ANY icon opens the one `authenticateAsync()`
+ * prompt, and the OS itself decides what that prompt leads with (fingerprint,
+ * if fingerprint is enrolled, regardless of which icon was tapped). A
+ * dedicated passcode-shaped button that then asks for a fingerprint reads as
+ * broken, not "honest about availability" — so passcode is a caption under
+ * the real icons now ("or your device passcode if that fails"), which is
+ * what it actually is: the prompt's own automatic fallback, not a distinct
+ * option. See `supportedBiometricTypes()`'s doc comment for the same
+ * platform constraint from the storage side.
  *
  * Visual layer, R3U-WAA-WEB-REDESIGN.md's follow-up: renders through
  * `AuthShell` (src/web/webUi.tsx) — the same glass chrome as
@@ -200,15 +209,24 @@ function LoginForm() {
               <Text style={{ fontSize: 12, color: palette.muted, textAlign: 'center', marginBottom: 10 }}>
                 Continue as <Text style={{ fontWeight: '700', color: palette.text }}>{bioRecord.identifierLabel}</Text>
               </Text>
-              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16, marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16, marginBottom: 10 }}>
                 {bioTypes.face ? (
                   <BioIconButton icon={FaceIdIcon} busy={bioBusy} disabled={busy} onPress={signInWithBiometrics} palette={palette} />
                 ) : null}
                 {bioTypes.fingerprint ? (
                   <BioIconButton icon={FingerprintIcon} busy={bioBusy} disabled={busy} onPress={signInWithBiometrics} palette={palette} />
                 ) : null}
-                <BioIconButton icon={PasscodeIcon} busy={bioBusy} disabled={busy} onPress={signInWithBiometrics} palette={palette} />
+                {/* Neither reported — still real (a device can be
+                    "biometric available" via a type this build doesn't
+                    branch on) — one generic tap target so quick sign-in
+                    still works rather than silently disappearing. */}
+                {!bioTypes.face && !bioTypes.fingerprint ? (
+                  <BioIconButton icon={PasscodeIcon} busy={bioBusy} disabled={busy} onPress={signInWithBiometrics} palette={palette} />
+                ) : null}
               </View>
+              <Text style={{ fontSize: 10.5, color: palette.muted, textAlign: 'center', marginBottom: 14 }}>
+                Your phone's passcode works too, if that fails.
+              </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                 <View style={{ flex: 1, height: 1, backgroundColor: palette.border }} />
                 <Text style={{ fontSize: 11, color: palette.muted, fontWeight: '700' }}>OR SIGN IN WITH PASSWORD</Text>

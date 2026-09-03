@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Slot, useRouter, useSegments } from 'expo-router';
@@ -20,37 +20,47 @@ import { resolvePalette } from '../src/web/webTheme';
  * above still resolving session/role. R3U-WAA-WEB-REDESIGN.md's follow-up:
  * this used to be a flat `colors.ink` screen with an orange brand mark, the
  * one piece of chrome the glass pass had missed, so the very first thing
- * anyone saw still looked like the old app. Same fixed Aurora/dark palette
- * as `AuthShell` (src/web/webUi.tsx) but deliberately not that component
- * itself — this renders before `SafeAreaProvider`/`SessionProvider` are even
- * mounted, so it stays dependency-light rather than pulling in
- * `WebThemeProvider` + safe-area-insets for a screen with no interactive
- * content and no card. */
-const SPLASH_PALETTE = resolvePalette('aurora', 'dark');
-
+ * anyone saw still looked like the old app.
+ *
+ * Aurora accent, but the light/dark half now follows the phone's own
+ * setting via `useColorScheme()` — a real report from testing: this stayed
+ * hardcoded dark even on a phone set to light mode, defying the
+ * Light/Dark/System picker the rest of the app already has. `useColorScheme`
+ * is a plain RN hook (no provider needed), which is why it's used here
+ * instead of `useWebTheme()` — this still renders before
+ * `SafeAreaProvider`/`SessionProvider` (let alone `WebThemeProvider`) are
+ * mounted, so it stays dependency-light on purpose. One real scope cut, not
+ * silently dropped: an explicit Light or Dark *override* picked elsewhere
+ * in the app isn't read here — only "System" is, since anything else needs
+ * an AsyncStorage read before first paint, which would trade this screen's
+ * instant appearance for a flash of the wrong color while that resolves.
+ * The splash is on screen for well under a second in normal use, so that
+ * tradeoff isn't worth it for the override case specifically. */
 function Splash({ subtitle }: { subtitle?: string }) {
+  const scheme = useColorScheme();
+  const palette = resolvePalette('aurora', scheme === 'light' ? 'light' : 'dark');
   return (
-    <View style={[s.splash, { backgroundColor: SPLASH_PALETTE.bg }]}>
+    <View style={[s.splash, { backgroundColor: palette.bg }]}>
       <LinearGradient
-        colors={[SPLASH_PALETTE.bg, SPLASH_PALETTE.bg2]}
+        colors={[palette.bg, palette.bg2]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <View pointerEvents="none" style={[s.glowA, { backgroundColor: SPLASH_PALETTE.accent }]} />
-      <View pointerEvents="none" style={[s.glowB, { backgroundColor: SPLASH_PALETTE.accent2 }]} />
+      <View pointerEvents="none" style={[s.glowA, { backgroundColor: palette.accent }]} />
+      <View pointerEvents="none" style={[s.glowB, { backgroundColor: palette.accent2 }]} />
 
       <LinearGradient
-        colors={[SPLASH_PALETTE.accent, SPLASH_PALETTE.accent2]}
+        colors={[palette.accent, palette.accent2]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={s.splashMark}
       >
         <Text style={s.splashMarkText}>R3</Text>
       </LinearGradient>
-      <Text style={[s.splashBrand, { color: SPLASH_PALETTE.text }]}>R3U</Text>
-      {subtitle ? <Text style={[s.splashName, { color: SPLASH_PALETTE.muted }]}>{subtitle}</Text> : null}
-      <ActivityIndicator color={SPLASH_PALETTE.accent2} style={{ marginTop: 18 }} />
+      <Text style={[s.splashBrand, { color: palette.text }]}>R3U</Text>
+      {subtitle ? <Text style={[s.splashName, { color: palette.muted }]}>{subtitle}</Text> : null}
+      <ActivityIndicator color={palette.accent2} style={{ marginTop: 18 }} />
     </View>
   );
 }
