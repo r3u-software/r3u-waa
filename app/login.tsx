@@ -185,9 +185,14 @@ function LoginForm() {
 
       // Supabase rotates the refresh token on every use — keep the saved
       // copy current so the *next* biometric attempt still works.
+      // SessionProvider's auth listener also syncs this on its own now;
+      // this explicit save just guarantees it lands before the redirect.
+      // Spread the record so `authUserId` survives (a legacy record without
+      // one gets it filled in from the session it just proved it owns).
       await saveBiometricSession({
-        identifierLabel: bioRecord.identifierLabel,
+        ...bioRecord,
         refreshToken: data.session.refresh_token,
+        authUserId: data.session.user.id,
       });
       // Root guard takes it from here.
     } catch {

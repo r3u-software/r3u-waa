@@ -9,7 +9,7 @@ import React, {
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
-import { loadBiometricSession } from './biometricAuth';
+import { loadBiometricSession, syncBiometricRefreshToken } from './biometricAuth';
 import type { WaaHrAdmin, WaaPlatformOwner, WaaSupervisor, WaaWorker } from './types';
 
 export type Role = 'worker' | 'supervisor' | 'hr_admin' | 'platform_owner';
@@ -198,6 +198,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
       setSession(data.session);
+      if (data.session) {
+        void syncBiometricRefreshToken(data.session.refresh_token, data.session.user.id);
+      }
       await resolveRole(data.session?.user.id);
       resolvedUserId.current = data.session?.user.id;
       if (active) setLoading(false);
@@ -206,6 +209,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (!active) return;
       const nextUserId = newSession?.user.id;
+      // Keep the biometric quick-sign-in record's refresh token current.
+      // Supabase rotates refresh tokens on every use, including the
+      // client's own silent background refreshes — without this, the
+      // stored token goes stale the first time the session refreshes and
+      // the next biometric attempt fails as "expired". Fire-and-forget:
+      // a SecureStore write, not a Supabase call, so no deadlock risk
+      // inside this callback, and nothing here should wait on it.
+      if (newSession) {
+        void syncBiometricRefreshToken(newSession.refresh_token, newSession.user.id);
+      }
       // `loading` drives the root guard's full-screen splash, which unmounts
       // whatever is on screen. Only a genuine identity change (sign-in,
       // sign-out) warrants that. Same-user events — TOKEN_REFRESHED, and

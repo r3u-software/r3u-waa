@@ -28,11 +28,20 @@ import { supabase } from './supabase';
 const RECORD_KEY = 'r3u-waa-biometric-session';
 
 export interface BiometricRecord {
-  /** Whatever the person typed at their last password sign-in — phone
-   * number, HR login code, or email. Shown back as "Continue as …" so the
-   * quick-login button isn't anonymous. Never the password itself. */
+  /** The account's own User ID (login_code). Shown back as "Continue as …"
+   * so the quick-login button isn't anonymous. Never the password itself. */
   identifierLabel: string;
   refreshToken: string;
+  /** The Supabase auth user this record belongs to. `syncBiometricRefreshToken`
+   * refuses to update the token unless the live session's user matches —
+   * otherwise a *different* person signing in with a password on the same
+   * phone would silently overwrite this record's token with their own, and
+   * "Continue as WK-…" would then sign in as them. Optional only so records
+   * written before this field existed still parse; those never get synced
+   * (they were already stale for the reason described on
+   * `syncBiometricRefreshToken`), fail once, clear themselves, and the
+   * person re-enables the toggle to get a proper record. */
+  authUserId?: string;
 }
 
 /** Native-only: SecureStore has no meaningful web implementation, and
@@ -159,10 +168,37 @@ export async function enableBiometricLogin(identifierLabel: string): Promise<boo
   if (!ok) return false;
   const { data } = await supabase.auth.getSession();
   const refreshToken = data.session?.refresh_token;
-  if (!refreshToken) return false;
+  const authUserId = data.session?.user.id;
+  if (!refreshToken || !authUserId) return false;
   // Whatever saveBiometricSession reports is the truth now — see its own
   // doc comment for why this used to report success unconditionally.
-  return saveBiometricSession({ identifierLabel, refreshToken });
+  return saveBiometricSession({ identifierLabel, refreshToken, authUserId });
+}
+
+/**
+ * THE actual root cause behind every "Your saved sign-in has expired" report
+ * from real-device testing, after two rounds of treating symptoms:
+ *
+ * Supabase rotates the refresh token on EVERY use — and "use" includes the
+ * client's own silent background refreshes (`autoRefreshToken: true` in
+ * supabase.ts) that happen while the app is simply open. So a token
+ * snapshotted once at toggle-enable time was stale within minutes, the next
+ * biometric attempt failed with "expired", and that failure path deleted
+ * the record — which is also exactly why the toggle then read "off" again
+ * in Profile. One cause, both symptoms.
+ *
+ * Fix: `SessionProvider` calls this on every auth event that carries a
+ * session, so the stored token always tracks the live one. Guarded by
+ * `authUserId` — see `BiometricRecord` for why that matters on a shared
+ * phone. Fire-and-forget safe: a no-op when there's no record, when the
+ * token hasn't changed, or when the session belongs to someone else.
+ */
+export async function syncBiometricRefreshToken(refreshToken: string, authUserId: string): Promise<void> {
+  if (!biometricLoginSupported()) return;
+  const record = await loadBiometricSession();
+  if (!record || !record.authUserId || record.authUserId !== authUserId) return;
+  if (record.refreshToken === refreshToken) return;
+  await saveBiometricSession({ ...record, refreshToken });
 }
 
 /** Forgets this device. Called from the explicit "Sign out" button (not the
