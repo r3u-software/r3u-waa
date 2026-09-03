@@ -32,7 +32,7 @@
         "android.permission.USE_FINGERPRINT",
         "android.permission.RECORD_AUDIO"
       ],
-      "versionCode": 6
+      "versionCode": 7
     },
     "web": {
       "favicon": "./assets/favicon.png",
