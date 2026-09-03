@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSession, useSupervisor } from '../../../src/lib/session';
+import { loadBiometricSession } from '../../../src/lib/biometricAuth';
 import { useAsync } from '../../../src/lib/useAsync';
 import { fetchProjects, fetchRoster } from '../../../src/lib/queries';
 import { supabase } from '../../../src/lib/supabase';
@@ -43,11 +44,22 @@ export default function SupervisorProfile() {
 
   const incomplete = (data?.roster ?? []).filter((w) => w.status !== 'complete').length;
 
-  function confirmSignOut() {
-    Alert.alert('Sign out?', 'You will need your User ID and password to get back in.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: signOut },
-    ]);
+  async function confirmSignOut() {
+    // Quick sign-in survives a normal sign-out now (see signOut's own doc
+    // comment in session.tsx) — say so here too, since the old blanket
+    // "you will need your password" line is only true when it's off.
+    const record = await loadBiometricSession();
+    const quickSignInOn = !!record && record.identifierLabel === supervisor.login_code;
+    Alert.alert(
+      'Sign out?',
+      quickSignInOn
+        ? 'You can sign back in with your fingerprint, face, or passcode — or your User ID and password.'
+        : 'You will need your User ID and password to get back in.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign out', style: 'destructive', onPress: signOut },
+      ]
+    );
   }
 
   return (
