@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, ViewSt
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Line, LinearGradient, Polygon, Polyline, Stop } from 'react-native-svg';
 import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useWebTheme, webOnlyStyle, WebPalette } from './webTheme';
 
 /**
@@ -26,23 +27,28 @@ export function GlassCard({
   style?: ViewStyle;
   onPress?: () => void;
 }) {
-  const { palette } = useWebTheme();
-  const box: ViewStyle = {
-    backgroundColor: palette.panel,
+  const { palette, mode } = useWebTheme();
+  const outer: ViewStyle = {
+    borderRadius: 15,
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 15,
-    padding: 16,
-    ...webOnlyStyle({ backdropFilter: 'blur(14px)', boxShadow: '0 10px 30px rgba(0,0,0,0.16)' }),
+    overflow: 'hidden',
+    ...webOnlyStyle({ boxShadow: '0 10px 30px rgba(0,0,0,0.16)' }),
   };
+  const inner: ViewStyle = { backgroundColor: palette.panel, padding: 16 };
+  const content = (
+    <BlurView intensity={mode === 'dark' ? 34 : 50} tint={mode} style={inner}>
+      {children}
+    </BlurView>
+  );
   if (onPress) {
     return (
-      <Pressable onPress={onPress} style={({ pressed }) => [box, style, pressed && { opacity: 0.85 }]}>
-        {children}
+      <Pressable onPress={onPress} style={({ pressed }) => [outer, style, pressed && { opacity: 0.85 }]}>
+        {content}
       </Pressable>
     );
   }
-  return <View style={[box, style]}>{children}</View>;
+  return <View style={[outer, style]}>{content}</View>;
 }
 
 export function GlassPanel({
@@ -339,6 +345,74 @@ export function GlassErrorBanner({ message }: { message: string }) {
   );
 }
 
+/** Full-screen gradient + glow background, used by every native Worker
+ * screen (R3U-WAA-WEB-REDESIGN.md's native follow-up) — the same ambient
+ * treatment as `AuthShell`, just without its centered auth-card layout,
+ * since these are full scrollable content screens. */
+export function GlassScreen({ children }: { children: React.ReactNode }) {
+  const { palette } = useWebTheme();
+  return (
+    <View style={{ flex: 1, backgroundColor: palette.bg }}>
+      <ExpoLinearGradient
+        colors={[palette.bg, palette.bg2]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill as ViewStyle}
+      />
+      <View
+        pointerEvents="none"
+        style={{ position: 'absolute', top: -120, left: -100, width: 280, height: 280, borderRadius: 999, backgroundColor: palette.accent, opacity: 0.18 }}
+      />
+      <View
+        pointerEvents="none"
+        style={{ position: 'absolute', top: 40, right: -120, width: 260, height: 260, borderRadius: 999, backgroundColor: palette.accent2, opacity: 0.12 }}
+      />
+      {children}
+    </View>
+  );
+}
+
+/** Icon + title/subtitle + status pill, tappable — the native equivalent of
+ * `ui.tsx`'s `ListCard`, for activity feeds (punches, cash advances, leave
+ * requests) on the glass canvas. */
+export function GlassListRow({
+  icon,
+  title,
+  subtitle,
+  tone,
+  pillLabel,
+  onPress,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle?: string;
+  tone?: WebPillTone;
+  pillLabel?: string;
+  onPress?: () => void;
+}) {
+  const { palette } = useWebTheme();
+  return (
+    <GlassCard onPress={onPress} style={{ marginBottom: 9, padding: 13 }}>
+      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+        <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: palette.hover, alignItems: 'center', justifyContent: 'center' }}>
+          {icon}
+        </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }} numberOfLines={2}>
+            {title}
+          </Text>
+          {subtitle ? (
+            <Text style={{ fontSize: 11.5, color: palette.muted, lineHeight: 16 }} numberOfLines={2}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+        {pillLabel ? <WebPill label={pillLabel} tone={tone} /> : null}
+      </View>
+    </GlassCard>
+  );
+}
+
 /** Label / big value / note panel — the login-code callout on
  * complete-profile.tsx, the dashboard-URL callout on blocked-use-web.tsx. */
 export function GlassCallout({ label, value, note }: { label: string; value: string; note?: string }) {
@@ -429,31 +503,43 @@ export function Chip({
   onPress?: () => void;
 }) {
   const { palette } = useWebTheme();
+  if (active) {
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityState={{ selected: true }}
+        style={({ pressed }) => [{ borderRadius: 999, overflow: 'hidden' }, pressed && { opacity: 0.85 }]}
+      >
+        <ExpoLinearGradient
+          colors={[palette.accent, palette.accent2]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{ paddingHorizontal: 14, paddingVertical: 8 }}
+        >
+          <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#fff' }}>{label}</Text>
+        </ExpoLinearGradient>
+      </Pressable>
+    );
+  }
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityState={{ selected: !!active }}
+      accessibilityState={{ selected: false }}
       style={({ pressed }) => [
         {
           paddingHorizontal: 14,
           paddingVertical: 8,
           borderRadius: 999,
           borderWidth: 1,
-          borderColor: active ? 'transparent' : palette.border,
-          backgroundColor: active ? palette.accent : palette.panel,
-          ...webOnlyStyle(
-            active
-              ? { backgroundImage: `linear-gradient(135deg, ${palette.accent}, ${palette.accent2})` }
-              : {}
-          ),
+          borderColor: palette.border,
+          backgroundColor: palette.panel,
         } as ViewStyle,
-        pressed && !active ? { backgroundColor: palette.hover } : null,
+        pressed ? { backgroundColor: palette.hover } : null,
       ]}
     >
-      <Text style={{ fontSize: 12.5, fontWeight: '600', color: active ? '#fff' : palette.muted }}>
-        {label}
-      </Text>
+      <Text style={{ fontSize: 12.5, fontWeight: '600', color: palette.muted }}>{label}</Text>
     </Pressable>
   );
 }
@@ -476,6 +562,16 @@ export function WebPill({ label, tone = 'muted' }: { label: string; tone?: WebPi
       <Text style={{ fontSize: 10.5, fontWeight: '700', color: c.fg }}>{label}</Text>
     </View>
   );
+}
+
+/** Maps `theme.ts`'s `StatusTone` ('ok'/'pending'/'warn'/'muted' — the
+ * paper-app vocabulary, still what every query/format helper returns) onto
+ * `WebPillTone` for glass screens that reuse that same status logic. */
+export function webToneFor(statusTone: 'ok' | 'pending' | 'warn' | 'muted'): WebPillTone {
+  if (statusTone === 'ok') return 'good';
+  if (statusTone === 'pending') return 'info';
+  if (statusTone === 'warn') return 'bad';
+  return 'muted';
 }
 
 /* ------------------------------------------------------------ Data table --- */

@@ -5,22 +5,28 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // the standalone @react-navigation packages, so the tab-bar prop type comes
 // out of the js-tabs entry point.
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import { colors, fonts } from '../theme';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useWebTheme } from '../web/webTheme';
 
 /**
- * Custom tab bar reproducing the mockup's bottom nav: label under a line
- * icon, and a small safety-orange dot under the active item.
+ * Glass tab bar — R3U-WAA-WEB-REDESIGN.md's native follow-up. Shared by
+ * Worker and Supervisor's `(tabs)/_layout.tsx`; each mounts its own
+ * `WebThemeProvider` (fixed Aurora/dark), so this reads the same
+ * `useWebTheme()` the rest of that role's screens do rather than the old
+ * `colors.paper`/`colors.safety` pairing.
  */
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { palette } = useWebTheme();
 
   return (
-    <View style={[s.bar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+    <BlurView intensity={40} tint="dark" style={[s.bar, { borderTopColor: palette.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         const focused = state.index === index;
         const label = (options.title ?? route.name) as string;
-        const color = focused ? colors.ink : colors.muted;
+        const color = focused ? '#fff' : palette.muted;
 
         const onPress = () => {
           const event = navigation.emit({
@@ -33,6 +39,8 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           }
         };
 
+        const icon = options.tabBarIcon?.({ focused, color, size: 19 });
+
         return (
           <Pressable
             key={route.key}
@@ -42,27 +50,45 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             accessibilityState={focused ? { selected: true } : {}}
             accessibilityLabel={label}
           >
-            {options.tabBarIcon?.({ focused, color, size: 20 })}
-            <Text style={[s.label, { color }]}>{label}</Text>
-            <View style={[s.dot, focused && s.dotActive]} />
+            {focused ? (
+              <LinearGradient
+                colors={[palette.accent, palette.accent2]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={s.activePill}
+              >
+                {icon}
+                <Text style={[s.label, { color: '#fff' }]}>{label}</Text>
+              </LinearGradient>
+            ) : (
+              <View style={s.inactivePill}>
+                {icon}
+                <Text style={[s.label, { color }]}>{label}</Text>
+              </View>
+            )}
           </Pressable>
         );
       })}
-    </View>
+    </BlurView>
   );
 }
 
 const s = StyleSheet.create({
   bar: {
     flexDirection: 'row',
-    backgroundColor: colors.paper,
     borderTopWidth: 1,
-    borderTopColor: colors.line,
     paddingTop: 10,
     paddingHorizontal: 8,
   },
-  item: { flex: 1, alignItems: 'center', gap: 4 },
-  label: { fontSize: 10, fontFamily: fonts.bodySemi },
-  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'transparent', marginTop: 1 },
-  dotActive: { backgroundColor: colors.safety },
+  item: { flex: 1, alignItems: 'center' },
+  activePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  inactivePill: { alignItems: 'center', gap: 3, paddingVertical: 2 },
+  label: { fontSize: 10.5, fontWeight: '700' },
 });

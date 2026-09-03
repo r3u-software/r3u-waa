@@ -1,27 +1,22 @@
 import React, { useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useWorker } from '../../src/lib/session';
 import { useAsync } from '../../src/lib/useAsync';
 import { fetchWorkerLeaveRequests, submitLeaveRequest } from '../../src/lib/queries';
-import { ScreenBody } from '../../src/components/Screen';
-import {
-  Card,
-  EmptyState,
-  ErrorNote,
-  Field,
-  Loader,
-  Pill,
-  PrimaryButton,
-  Section,
-} from '../../src/components/ui';
-import { colors, fonts, radius, spacing, toneForStatus, type } from '../../src/theme';
+import { EmptyState } from '../../src/components/ui';
+import { toneForStatus } from '../../src/theme';
 import { dateRange, relativeStamp, toDateColumn } from '../../src/lib/format';
+import { useWebTheme } from '../../src/web/webTheme';
+import { Chip, GlassButton, GlassCard, GlassErrorBanner, GlassField, GlassScreen, WebPill, webToneFor } from '../../src/web/webUi';
 
 const LEAVE_TYPES = ['Sick', 'Vacation', 'Emergency', 'Unpaid'];
 
 export default function LeaveScreen() {
   const worker = useWorker();
+  const { palette } = useWebTheme();
+  const insets = useSafeAreaInsets();
   const [leaveType, setLeaveType] = useState(LEAVE_TYPES[0]);
   const [from, setFrom] = useState(new Date());
   const [to, setTo] = useState(new Date());
@@ -77,20 +72,20 @@ export default function LeaveScreen() {
   }
 
   return (
-    <ScreenBody refreshing={loading} onRefresh={reload}>
-      <Section title="File leave">
-        {error ? <ErrorNote message={error} /> : null}
-        <Card style={{ padding: spacing.xl }}>
-          <Text style={[type.label, { marginBottom: 6 }]}>Leave type</Text>
+    <GlassScreen>
+      <ScrollView
+        contentContainerStyle={{ padding: 20, paddingTop: insets.top + 20, paddingBottom: 40 }}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={palette.muted} />}
+      >
+        <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text, marginBottom: 10 }}>File leave</Text>
+        {error ? <GlassErrorBanner message={error} /> : null}
+        <GlassCard style={{ marginBottom: 20 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: palette.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
+            Leave type
+          </Text>
           <View style={s.typeRow}>
             {LEAVE_TYPES.map((t) => (
-              <Pressable
-                key={t}
-                onPress={() => setLeaveType(t)}
-                style={[s.typeChip, leaveType === t && s.typeChipActive]}
-              >
-                <Text style={[s.typeText, leaveType === t && s.typeTextActive]}>{t}</Text>
-              </Pressable>
+              <Chip key={t} label={t} active={leaveType === t} onPress={() => setLeaveType(t)} />
             ))}
           </View>
 
@@ -110,59 +105,51 @@ export default function LeaveScreen() {
           ) : null}
           {picking && Platform.OS === 'ios' ? (
             <Pressable onPress={() => setPicking(null)} style={s.doneBtn}>
-              <Text style={s.doneText}>Done</Text>
+              <Text style={{ color: palette.accent2, fontWeight: '700', fontSize: 13 }}>Done</Text>
             </Pressable>
           ) : null}
 
-          <Field
-            label="Reason"
-            value={reason}
-            onChangeText={setReason}
-            placeholder="Why are you filing leave?"
-            multiline
-          />
+          <GlassField label="Reason" value={reason} onChangeText={setReason} placeholder="Why are you filing leave?" multiline />
 
-          <PrimaryButton label={busy ? 'Filing…' : 'File leave'} onPress={submit} loading={busy} />
-        </Card>
-      </Section>
+          <GlassButton label={busy ? 'Filing…' : 'File leave'} onPress={submit} loading={busy} />
+        </GlassCard>
 
-      <Section title="Your leave history">
-        {loading && !data ? (
-          <Loader />
-        ) : (data?.length ?? 0) === 0 ? (
+        <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text, marginBottom: 10 }}>Your leave history</Text>
+        {(data?.length ?? 0) === 0 ? (
           <EmptyState title="No leave filed" body="Leave you file will be listed here." />
         ) : (
           data!.map((l) => (
-            <Card key={l.id}>
-              <View style={s.rowTop}>
+            <GlassCard key={l.id} style={{ marginBottom: 9 }}>
+              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={type.cardTitle}>
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>
                     {l.leave_type} · {dateRange(l.date_from, l.date_to)}
                   </Text>
-                  <Text style={type.cardSub}>
+                  <Text style={{ fontSize: 12, color: palette.muted, lineHeight: 17, marginTop: 2 }}>
                     {l.reason || 'No reason given'} · filed {relativeStamp(l.created_at)}
                   </Text>
                 </View>
-                <Pill label={l.status} tone={toneForStatus(l.status)} />
+                <WebPill label={l.status} tone={webToneFor(toneForStatus(l.status))} />
               </View>
               {l.status === 'declined' && l.decline_remarks ? (
-                <View style={s.remarks}>
-                  <Text style={s.remarksText}>Supervisor's remarks: {l.decline_remarks}</Text>
+                <View style={{ backgroundColor: palette.badBg, borderRadius: 10, padding: 10, marginTop: 10 }}>
+                  <Text style={{ fontSize: 12, color: palette.bad, lineHeight: 17 }}>Supervisor's remarks: {l.decline_remarks}</Text>
                 </View>
               ) : null}
-            </Card>
+            </GlassCard>
           ))
         )}
-      </Section>
-    </ScreenBody>
+      </ScrollView>
+    </GlassScreen>
   );
 }
 
 function DateBox({ label, value, onPress }: { label: string; value: Date; onPress: () => void }) {
+  const { palette } = useWebTheme();
   return (
-    <Pressable style={s.dateBox} onPress={onPress}>
-      <Text style={[type.label, { marginBottom: 4 }]}>{label}</Text>
-      <Text style={s.dateValue}>
+    <Pressable style={[s.dateBox, { borderColor: palette.border, backgroundColor: palette.hover }]} onPress={onPress}>
+      <Text style={{ fontSize: 11, fontWeight: '700', color: palette.muted, marginBottom: 4 }}>{label}</Text>
+      <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>
         {value.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
       </Text>
     </Pressable>
@@ -170,31 +157,8 @@ function DateBox({ label, value, onPress }: { label: string; value: Date; onPres
 }
 
 const s = StyleSheet.create({
-  typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
-  typeChip: {
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.paper,
-  },
-  typeChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  typeText: { fontSize: 12, fontFamily: fonts.bodySemi, color: colors.muted },
-  typeTextActive: { color: colors.paper },
-  dateRow: { flexDirection: 'row', gap: 10, marginBottom: spacing.lg },
-  dateBox: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.lg,
-    padding: 12,
-    backgroundColor: colors.paper,
-  },
-  dateValue: { fontSize: 13.5, fontFamily: fonts.bodySemi, color: colors.ink },
+  typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  dateRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  dateBox: { flex: 1, borderWidth: 1, borderRadius: 12, padding: 12 },
   doneBtn: { alignSelf: 'flex-end', paddingVertical: 8, paddingHorizontal: 4 },
-  doneText: { color: colors.steel, fontFamily: fonts.bodyBold, fontSize: 13 },
-  rowTop: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  remarks: { backgroundColor: colors.warnBg, borderRadius: 10, padding: 10, marginTop: 10 },
-  remarksText: { fontSize: 12, color: colors.warn, lineHeight: 17, fontFamily: fonts.body },
 });

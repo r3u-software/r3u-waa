@@ -11,6 +11,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/inter';
 import { SessionProvider, useSession } from '../src/lib/session';
+import { useIdleLogout } from '../src/lib/useIdleLogout';
 import { resolvePalette } from '../src/web/webTheme';
 
 /**
@@ -77,10 +78,16 @@ function Splash({ subtitle }: { subtitle?: string }) {
  * owed — there is no route into a role group while either gate is open.
  */
 function RootNavigator() {
-  const { loading, session, role, roleError, mustChangePassword, hrProfileIncomplete } =
+  const { loading, session, role, roleError, mustChangePassword, hrProfileIncomplete, signOut } =
     useSession();
   const segments = useSegments();
   const router = useRouter();
+
+  // "Both mobile and web app will logout after 5 mins no activities." Web
+  // gets its own DOM listeners inside the hook; native activity comes from
+  // the onStartShouldSetResponder on the root View below, which observes
+  // every touch without capturing it away from whatever child handles it.
+  const { markActivity } = useIdleLogout(!!session, signOut);
 
   const group = segments[0];
   const inWorker = group === '(worker)';
@@ -201,7 +208,17 @@ function RootNavigator() {
     return <Splash subtitle="Worker's Attendance" />;
   }
 
-  return <Slot />;
+  return (
+    <View
+      style={{ flex: 1 }}
+      onStartShouldSetResponder={() => {
+        markActivity();
+        return false;
+      }}
+    >
+      <Slot />
+    </View>
+  );
 }
 
 export default function RootLayout() {

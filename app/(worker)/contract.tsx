@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { useWorker } from '../../src/lib/session';
 import { getSignedUrl } from '../../src/lib/storage';
 import { EmptyState } from '../../src/components/ui';
 import { PdfViewer } from '../../src/components/PdfViewer';
-import { colors, fonts, spacing } from '../../src/theme';
+import { useWebTheme } from '../../src/web/webTheme';
+import { GlassScreen } from '../../src/web/webUi';
 
 /**
  * Read-only contract viewer.
@@ -19,6 +20,7 @@ import { colors, fonts, spacing } from '../../src/theme';
  */
 export default function ContractScreen() {
   const worker = useWorker();
+  const { palette } = useWebTheme();
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -36,35 +38,27 @@ export default function ContractScreen() {
 
   if (loading) {
     return (
-      <View style={s.center}>
-        <ActivityIndicator color={colors.steel} />
-        <Text style={s.hint}>Opening your contract…</Text>
-      </View>
+      <GlassScreen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+          <ActivityIndicator color={palette.muted} />
+          <Text style={{ fontSize: 12, color: palette.muted }}>Opening your contract…</Text>
+        </View>
+      </GlassScreen>
     );
   }
 
   if (!worker.contract_pdf_url || !url) {
     return (
-      <View style={s.pad}>
-        <EmptyState
-          title="No contract uploaded yet"
-          body="Your supervisor attaches your signed contract here once it is ready. You will be able to read it, but not edit or replace it."
-        />
-      </View>
+      <GlassScreen>
+        <View style={{ flex: 1, padding: 20, justifyContent: 'center' }}>
+          <EmptyState
+            title="No contract uploaded yet"
+            body="Your supervisor attaches your signed contract here once it is ready. You will be able to read it, but not edit or replace it."
+          />
+        </View>
+      </GlassScreen>
     );
   }
 
   return <PdfViewer url={url} />;
 }
-
-const s = StyleSheet.create({
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: colors.paper,
-  },
-  hint: { fontSize: 12, color: colors.muted, fontFamily: fonts.body },
-  pad: { flex: 1, padding: spacing.xl, backgroundColor: colors.paper, justifyContent: 'center' },
-});

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWorker } from '../../../src/lib/session';
 import { useAsync } from '../../../src/lib/useAsync';
 import {
@@ -11,19 +12,9 @@ import {
   fetchWorkerTimeEntries,
 } from '../../../src/lib/queries';
 import type { WaaPayslip } from '../../../src/lib/types';
-import { ScreenBody, TopBar } from '../../../src/components/Screen';
-import {
-  Card,
-  EmptyState,
-  ListCard,
-  Loader,
-  Pill,
-  PrimaryButton,
-  Section,
-  StatusStrip,
-} from '../../../src/components/ui';
+import { EmptyState, Pill } from '../../../src/components/ui';
 import { CashIcon, FileIcon, SiteGlyph } from '../../../src/components/icons';
-import { colors, fonts, radius, spacing, toneForStatus, type } from '../../../src/theme';
+import { toneForStatus } from '../../../src/theme';
 import {
   cutoffFor,
   hours,
@@ -33,6 +24,9 @@ import {
   timeOfDay,
   toDateColumn,
 } from '../../../src/lib/format';
+import { useWebTheme } from '../../../src/web/webTheme';
+import { GlassButton, GlassCard, GlassListRow, MetricCard, webToneFor } from '../../../src/web/webUi';
+import { LinearGradient } from 'expo-linear-gradient';
 
 /**
  * Pay tab.
@@ -53,6 +47,8 @@ import {
  */
 export default function WorkerPay() {
   const worker = useWorker();
+  const { palette } = useWebTheme();
+  const insets = useSafeAreaInsets();
   const [open, setOpen] = useState<WaaPayslip | null>(null);
 
   const { data, loading, reload } = useAsync(async () => {
@@ -158,150 +154,133 @@ export default function WorkerPay() {
   }, [cutoffEntries]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.paper }}>
-      <TopBar label="Pay" />
-      <ScreenBody refreshing={loading} onRefresh={reload}>
-        <Text style={type.eyebrow}>Current cutoff</Text>
-        <Text style={type.greet}>{data?.window.label ?? '—'}</Text>
-        <Text style={[type.subgreet, { marginBottom: 20 }]}>
+    <View style={{ flex: 1, backgroundColor: palette.bg }}>
+      <LinearGradient colors={[palette.bg, palette.bg2]} style={StyleSheet.absoluteFill} />
+      <ScrollView
+        contentContainerStyle={{ padding: 20, paddingTop: insets.top + 20, paddingBottom: 40 }}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={palette.muted} />}
+      >
+        <Text style={{ fontSize: 11, letterSpacing: 1, color: palette.muted, fontWeight: '700' }}>Current cutoff</Text>
+        <Text style={{ fontSize: 22, fontWeight: '700', color: palette.text, marginTop: 3 }}>{data?.window.label ?? '—'}</Text>
+        <Text style={{ fontSize: 13, color: palette.muted, marginTop: 3, marginBottom: 20 }}>
           Running estimate · final figures come from your payslip
         </Text>
 
         {loading && !data ? (
-          <Loader label="Working out your estimate" />
+          <GlassCard>
+            <Text style={{ color: palette.muted, textAlign: 'center', paddingVertical: 20 }}>Working out your estimate…</Text>
+          </GlassCard>
         ) : (
           <>
             {/* ------------------------ Running estimate -------------------- */}
-            <Card style={s.estimateCard}>
-              <Text style={s.estimateLabel}>Estimated gross so far</Text>
-              <Text style={s.estimateAmount}>
-                {estimate.gross == null ? '—' : peso(estimate.gross)}
-              </Text>
-              {estimate.rate == null ? (
-                <Text style={s.estimateNote}>
-                  No hourly rate is on file for you yet, so we can't estimate an amount. The office
-                  sets this.
+            <View style={s.gradWrap}>
+              <LinearGradient colors={[palette.accent, palette.accent2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.gradCard}>
+                <Text style={{ fontSize: 10.5, letterSpacing: 1, color: 'rgba(255,255,255,0.8)', fontWeight: '700' }}>
+                  ESTIMATED GROSS SO FAR
                 </Text>
-              ) : (
-                <Text style={s.estimateNote}>
-                  {estimate.days} day{estimate.days === 1 ? '' : 's'} · {hours(estimate.worked)}{' '}
-                  worked at {peso(estimate.rate)}/hr
-                  {estimate.overtime > 0
-                    ? ` · ${hours(estimate.overtime)} overtime at ${Math.round(
-                        estimate.otRate * 100
-                      )}%`
-                    : ''}
+                <Text style={{ fontSize: 32, fontWeight: '800', color: '#fff', marginTop: 4 }}>
+                  {estimate.gross == null ? '—' : peso(estimate.gross)}
                 </Text>
-              )}
-              <Text style={s.estimateDisclaimer}>
-                This is an estimate from your approved punches only. Leave pay, statutory
-                deductions and any cash advance are worked out by the office when payroll runs.
-              </Text>
-            </Card>
+                {estimate.rate == null ? (
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)', lineHeight: 17, marginTop: 6 }}>
+                    No hourly rate is on file for you yet, so we can't estimate an amount. The office sets this.
+                  </Text>
+                ) : (
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)', lineHeight: 17, marginTop: 6 }}>
+                    {estimate.days} day{estimate.days === 1 ? '' : 's'} · {hours(estimate.worked)} worked at {peso(estimate.rate)}/hr
+                    {estimate.overtime > 0 ? ` · ${hours(estimate.overtime)} overtime at ${Math.round(estimate.otRate * 100)}%` : ''}
+                  </Text>
+                )}
+                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 16, marginTop: 8 }}>
+                  This is an estimate from your approved punches only. Leave pay, statutory deductions and any cash advance are worked
+                  out by the office when payroll runs.
+                </Text>
+              </LinearGradient>
+            </View>
 
-            <StatusStrip
-              chips={[
-                { value: estimate.days, label: 'Days worked', tone: 'ok' },
-                { value: pending, label: 'Awaiting review', tone: 'pending' },
-                { value: leaveDays, label: 'Leave days', tone: 'warn' },
-              ]}
-            />
+            <View style={s.statRow}>
+              <MetricCard style={s.statItem} label="Days worked" value={String(estimate.days)} trendPct={null} />
+              <MetricCard style={s.statItem} label="Awaiting review" value={String(pending)} trendPct={null} />
+              <MetricCard style={s.statItem} label="Leave days" value={String(leaveDays)} trendPct={null} />
+            </View>
 
             {outstandingTotal > 0 ? (
-              <Card style={s.advanceCard}>
-                <Text style={s.advanceLabel}>Advances released, not yet deducted</Text>
-                <Text style={s.advanceAmount}>{peso(outstandingTotal)}</Text>
-                <Text style={s.advanceNote}>
-                  This will be taken off an upcoming payslip.
+              <GlassCard style={{ marginBottom: 20, borderColor: palette.accent }}>
+                <Text style={{ fontSize: 10.5, letterSpacing: 1, color: palette.accent2, fontWeight: '700' }}>
+                  ADVANCES RELEASED, NOT YET DEDUCTED
                 </Text>
-              </Card>
+                <Text style={{ fontSize: 22, fontWeight: '700', color: palette.text, marginTop: 4 }}>{peso(outstandingTotal)}</Text>
+                <Text style={{ fontSize: 11.5, color: palette.muted, marginTop: 3 }}>This will be taken off an upcoming payslip.</Text>
+              </GlassCard>
             ) : null}
 
             {/* --------------------------- Payslips ------------------------- */}
-            <Section title="Payslips">
-              {(data?.payslips.length ?? 0) === 0 ? (
-                <EmptyState
-                  title="No payslips yet"
-                  body="A payslip appears here once the office marks its payroll run as paid."
+            <SectionTitle>Payslips</SectionTitle>
+            {(data?.payslips.length ?? 0) === 0 ? (
+              <EmptyState title="No payslips yet" body="A payslip appears here once the office marks its payroll run as paid." />
+            ) : (
+              data!.payslips.map((p) => (
+                <GlassListRow
+                  key={p.id}
+                  icon={<FileIcon size={17} color={palette.good} />}
+                  title={peso(p.net_pay)}
+                  subtitle={`Net pay · paid ${p.paid_at ? relativeStamp(p.paid_at) : 'recently'} · ${hours(p.worked_hours)} worked${
+                    Number(p.overtime_hours) > 0 ? ` · ${hours(p.overtime_hours)} OT` : ''
+                  }`}
+                  tone="good"
+                  pillLabel="Paid"
+                  onPress={() => setOpen(p)}
                 />
-              ) : (
-                data!.payslips.map((p) => (
-                  <ListCard
-                    key={p.id}
-                    iconBg={colors.okBg}
-                    icon={<FileIcon size={17} color={colors.ok} />}
-                    title={peso(p.net_pay)}
-                    subtitle={`Net pay · paid ${
-                      p.paid_at ? relativeStamp(p.paid_at) : 'recently'
-                    }\n${hours(p.worked_hours)} worked${
-                      Number(p.overtime_hours) > 0 ? ` · ${hours(p.overtime_hours)} OT` : ''
-                    }`}
-                    tone="ok"
-                    pillLabel="Paid"
-                    onPress={() => setOpen(p)}
-                  />
-                ))
-              )}
-            </Section>
+              ))
+            )}
 
             {/* ------------------------ Days this cutoff -------------------- */}
-            <Section title="Days in this cutoff">
-              {byDay.length === 0 ? (
-                <EmptyState
-                  title="No punches this cutoff"
-                  body="Days you clock in and out will be listed here."
-                />
-              ) : (
-                byDay.map(([day, dayEntries]) => {
-                  const inPunch = dayEntries.find((e) => e.type === 'in');
-                  const outPunch = dayEntries.find((e) => e.type === 'out');
-                  const worstStatus = dayEntries.some((e) => e.status === 'declined')
-                    ? 'declined'
-                    : dayEntries.some((e) => e.status === 'pending')
-                      ? 'pending'
-                      : 'approved';
-                  return (
-                    <ListCard
-                      key={day}
-                      iconBg={colors.neutralBg}
-                      icon={<SiteGlyph size={17} color={colors.steel} />}
-                      title={new Date(day).toLocaleDateString(undefined, {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                      subtitle={`In ${inPunch ? timeOfDay(inPunch.entry_timestamp) : '—'} · Out ${
-                        outPunch ? timeOfDay(outPunch.entry_timestamp) : '—'
-                      }\n${inPunch?.project?.name ?? outPunch?.project?.name ?? ''}`}
-                      tone={toneForStatus(worstStatus)}
-                      pillLabel={worstStatus}
-                    />
-                  );
-                })
-              )}
-            </Section>
+            <SectionTitle>Days in this cutoff</SectionTitle>
+            {byDay.length === 0 ? (
+              <EmptyState title="No punches this cutoff" body="Days you clock in and out will be listed here." />
+            ) : (
+              byDay.map(([day, dayEntries]) => {
+                const inPunch = dayEntries.find((e) => e.type === 'in');
+                const outPunch = dayEntries.find((e) => e.type === 'out');
+                const worstStatus = dayEntries.some((e) => e.status === 'declined')
+                  ? 'declined'
+                  : dayEntries.some((e) => e.status === 'pending')
+                    ? 'pending'
+                    : 'approved';
+                return (
+                  <GlassListRow
+                    key={day}
+                    icon={<SiteGlyph size={17} color={palette.text} />}
+                    title={new Date(day).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                    subtitle={`In ${inPunch ? timeOfDay(inPunch.entry_timestamp) : '—'} · Out ${
+                      outPunch ? timeOfDay(outPunch.entry_timestamp) : '—'
+                    } · ${inPunch?.project?.name ?? outPunch?.project?.name ?? ''}`}
+                    tone={webToneFor(toneForStatus(worstStatus))}
+                    pillLabel={worstStatus}
+                  />
+                );
+              })
+            )}
 
             {/* --------------------------- Advances ------------------------- */}
-            <Section title="Cash advances">
-              {(data?.advances.length ?? 0) === 0 ? (
-                <EmptyState title="No advances" body="Advances you ask for will be listed here." />
-              ) : (
-                data!.advances.slice(0, 8).map((a) => (
-                  <ListCard
-                    key={a.id}
-                    iconBg={colors.neutralBg}
-                    icon={<CashIcon size={17} color={colors.steel} />}
-                    title={a.money ? peso(a.money.amount) : 'Cash advance'}
-                    subtitle={`${a.reason || 'No reason given'} · ${relativeStamp(a.created_at)}`}
-                    tone={toneForStatus(a.status)}
-                    pillLabel={a.status === 'pending' ? 'requested' : a.status.replace('_', ' ')}
-                  />
-                ))
-              )}
-            </Section>
+            <SectionTitle>Cash advances</SectionTitle>
+            {(data?.advances.length ?? 0) === 0 ? (
+              <EmptyState title="No advances" body="Advances you ask for will be listed here." />
+            ) : (
+              data!.advances.slice(0, 8).map((a) => (
+                <GlassListRow
+                  key={a.id}
+                  icon={<CashIcon size={17} color={palette.text} />}
+                  title={a.money ? peso(a.money.amount) : 'Cash advance'}
+                  subtitle={`${a.reason || 'No reason given'} · ${relativeStamp(a.created_at)}`}
+                  tone={webToneFor(toneForStatus(a.status))}
+                  pillLabel={a.status === 'pending' ? 'requested' : a.status.replace('_', ' ')}
+                />
+              ))
+            )}
           </>
         )}
-      </ScreenBody>
+      </ScrollView>
 
       {/* ------------------------- Payslip breakdown ---------------------- */}
       <PayslipSheet slip={open} onClose={() => setOpen(null)} />
@@ -309,8 +288,14 @@ export default function WorkerPay() {
   );
 }
 
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  const { palette } = useWebTheme();
+  return <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text, marginTop: 6, marginBottom: 10 }}>{children}</Text>;
+}
+
 /** The full per-line breakdown, matching the layout of a printed payslip. */
 function PayslipSheet({ slip, onClose }: { slip: WaaPayslip | null; onClose: () => void }) {
+  const { palette } = useWebTheme();
   if (!slip) return null;
   const statutory =
     Number(slip.sss_deducted) +
@@ -321,12 +306,12 @@ function PayslipSheet({ slip, onClose }: { slip: WaaPayslip | null; onClose: () 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={s.backdrop} onPress={onClose}>
-        <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
-          <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 40 }}>
-            <View style={s.sheetHead}>
+        <Pressable style={[s.sheet, { backgroundColor: palette.panelSolid, borderColor: palette.border }]} onPress={(e) => e.stopPropagation()}>
+          <ScrollView contentContainerStyle={{ padding: 22, paddingBottom: 40 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 }}>
               <View style={{ flex: 1 }}>
-                <Text style={s.sheetTitle}>Payslip</Text>
-                <Text style={s.sheetSub}>
+                <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Payslip</Text>
+                <Text style={{ fontSize: 12.5, color: palette.muted, marginTop: 2 }}>
                   Paid {slip.paid_at ? shortDate(slip.paid_at.slice(0, 10)) : '—'}
                 </Text>
               </View>
@@ -334,28 +319,14 @@ function PayslipSheet({ slip, onClose }: { slip: WaaPayslip | null; onClose: () 
             </View>
 
             <Line label="Worked hours" value={hours(slip.worked_hours)} amount={slip.regular_pay} />
-            <Line
-              label="Overtime"
-              value={hours(slip.overtime_hours)}
-              amount={slip.overtime_pay}
-            />
-            <Line
-              label="Paid leave"
-              value={hours(slip.paid_leave_hours)}
-              amount={slip.leave_pay}
-            />
-            <Line
-              label="Unpaid leave"
-              value={`${slip.unpaid_leave_days} day${
-                Number(slip.unpaid_leave_days) === 1 ? '' : 's'
-              }`}
-              amount={0}
-            />
+            <Line label="Overtime" value={hours(slip.overtime_hours)} amount={slip.overtime_pay} />
+            <Line label="Paid leave" value={hours(slip.paid_leave_hours)} amount={slip.leave_pay} />
+            <Line label="Unpaid leave" value={`${slip.unpaid_leave_days} day${Number(slip.unpaid_leave_days) === 1 ? '' : 's'}`} amount={0} />
 
-            <View style={s.rule} />
+            <View style={[s.rule, { backgroundColor: palette.border }]} />
             <Line label="Gross pay" amount={slip.gross_pay} strong />
 
-            <View style={s.rule} />
+            <View style={[s.rule, { backgroundColor: palette.border }]} />
             <Line label="Cash advance" amount={-Number(slip.cash_advance_deducted)} />
             <Line label="SSS" amount={-Number(slip.sss_deducted)} />
             <Line label="Pag-IBIG" amount={-Number(slip.pagibig_deducted)} />
@@ -363,19 +334,17 @@ function PayslipSheet({ slip, onClose }: { slip: WaaPayslip | null; onClose: () 
             <Line label="Withholding tax" amount={-Number(slip.withholding_tax_deducted)} />
             <Line label="Total statutory" amount={-statutory} />
 
-            <View style={s.rule} />
-            <View style={s.netRow}>
-              <Text style={s.netLabel}>Net pay</Text>
-              <Text style={s.netValue}>{peso(slip.net_pay)}</Text>
-            </View>
+            <View style={[s.rule, { backgroundColor: palette.border }]} />
+            <LinearGradient colors={[palette.accent, palette.accent2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.netRow}>
+              <Text style={{ fontSize: 11, letterSpacing: 1, color: 'rgba(255,255,255,0.85)', fontWeight: '700' }}>NET PAY</Text>
+              <Text style={{ fontSize: 22, fontWeight: '800', color: '#fff' }}>{peso(slip.net_pay)}</Text>
+            </LinearGradient>
 
-            <Text style={s.proofNote}>
-              {slip.proof_url
-                ? 'Proof of payment is on file with the office for this slip.'
-                : 'No proof of payment is attached to this slip yet.'}
+            <Text style={{ fontSize: 11.5, color: palette.muted, lineHeight: 17, marginTop: 14 }}>
+              {slip.proof_url ? 'Proof of payment is on file with the office for this slip.' : 'No proof of payment is attached to this slip yet.'}
             </Text>
 
-            <PrimaryButton label="Close" tone="ink" onPress={onClose} style={{ marginTop: 18 }} />
+            <GlassButton label="Close" onPress={onClose} style={{ marginTop: 16 }} />
           </ScrollView>
         </Pressable>
       </Pressable>
@@ -383,25 +352,16 @@ function PayslipSheet({ slip, onClose }: { slip: WaaPayslip | null; onClose: () 
   );
 }
 
-function Line({
-  label,
-  value,
-  amount,
-  strong,
-}: {
-  label: string;
-  value?: string;
-  amount: number;
-  strong?: boolean;
-}) {
+function Line({ label, value, amount, strong }: { label: string; value?: string; amount: number; strong?: boolean }) {
+  const { palette } = useWebTheme();
   const n = Number(amount);
   return (
-    <View style={s.line}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 7 }}>
       <View style={{ flex: 1 }}>
-        <Text style={[s.lineLabel, strong && s.lineStrong]}>{label}</Text>
-        {value ? <Text style={s.lineValue}>{value}</Text> : null}
+        <Text style={{ fontSize: 13, color: palette.text, fontWeight: strong ? '700' : '400' }}>{label}</Text>
+        {value ? <Text style={{ fontSize: 11, color: palette.muted, marginTop: 1 }}>{value}</Text> : null}
       </View>
-      <Text style={[s.lineAmount, strong && s.lineStrong, n < 0 && { color: colors.warn }]}>
+      <Text style={{ fontSize: 13, color: n < 0 ? palette.bad : palette.text, fontWeight: strong ? '700' : '600' }}>
         {n < 0 ? `−${peso(Math.abs(n))}` : peso(n)}
       </Text>
     </View>
@@ -409,74 +369,12 @@ function Line({
 }
 
 const s = StyleSheet.create({
-  estimateCard: { backgroundColor: colors.ink, borderColor: colors.ink, gap: 4, marginBottom: 22 },
-  estimateLabel: {
-    fontSize: 10.5,
-    letterSpacing: 1,
-    color: colors.mutedOnDark,
-    fontFamily: fonts.bodySemi,
-  },
-  estimateAmount: { fontFamily: fonts.serif, fontSize: 32, fontWeight: '700', color: colors.safety },
-  estimateNote: { fontSize: 12, color: colors.paper, lineHeight: 17, fontFamily: fonts.body },
-  estimateDisclaimer: {
-    fontSize: 11,
-    color: colors.mutedOnDark,
-    lineHeight: 16,
-    marginTop: 6,
-    fontFamily: fonts.body,
-  },
-  advanceCard: {
-    backgroundColor: colors.pendingBg,
-    borderColor: colors.safety,
-    gap: 3,
-    marginBottom: 22,
-  },
-  advanceLabel: {
-    fontSize: 10.5,
-    letterSpacing: 1,
-    color: colors.safetyDeep,
-    fontFamily: fonts.bodySemi,
-  },
-  advanceAmount: { fontFamily: fonts.serif, fontSize: 24, fontWeight: '700', color: colors.ink },
-  advanceNote: { fontSize: 11.5, color: colors.muted, lineHeight: 16, fontFamily: fonts.body },
-
-  backdrop: { flex: 1, backgroundColor: 'rgba(28,27,24,0.5)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colors.paper,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    maxHeight: '88%',
-  },
-  sheetHead: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.lg },
-  sheetTitle: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '700', color: colors.ink },
-  sheetSub: { fontSize: 12.5, color: colors.muted, marginTop: 2, fontFamily: fonts.body },
-  line: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 7 },
-  lineLabel: { fontSize: 13, color: colors.ink, fontFamily: fonts.body },
-  lineValue: { fontSize: 11, color: colors.muted, marginTop: 1, fontFamily: fonts.body },
-  lineAmount: { fontSize: 13, color: colors.ink, fontFamily: fonts.bodySemi },
-  lineStrong: { fontFamily: fonts.bodyBold },
-  rule: { height: 1, backgroundColor: colors.line, marginVertical: 8 },
-  netRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.ink,
-    borderRadius: radius.lg,
-    padding: 14,
-    marginTop: 4,
-  },
-  netLabel: {
-    fontSize: 11,
-    letterSpacing: 1,
-    color: colors.mutedOnDark,
-    fontFamily: fonts.bodyBold,
-  },
-  netValue: { fontFamily: fonts.serif, fontSize: 26, fontWeight: '700', color: colors.safety },
-  proofNote: {
-    fontSize: 11.5,
-    color: colors.muted,
-    lineHeight: 17,
-    marginTop: 12,
-    fontFamily: fonts.body,
-  },
+  gradWrap: { borderRadius: 18, overflow: 'hidden', marginBottom: 16 },
+  gradCard: { padding: 20 },
+  statRow: { flexDirection: 'row', gap: 9, marginBottom: 16 },
+  statItem: { flex: 1, padding: 12 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, borderBottomWidth: 0, maxHeight: '88%' },
+  rule: { height: 1, marginVertical: 8 },
+  netRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 14, padding: 14, marginTop: 4 },
 });

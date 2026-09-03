@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useWorker } from '../../src/lib/session';
 import { captureLocation, captureSelfie, confirmWithBiometrics, Fix } from '../../src/lib/capture';
 import { uploadToBucket } from '../../src/lib/storage';
 import { insertTimeEntry } from '../../src/lib/queries';
-import { ScreenBody } from '../../src/components/Screen';
-import { ErrorNote, PrimaryButton, SecondaryButton } from '../../src/components/ui';
 import { CameraIcon, LockIcon, MapPinIcon } from '../../src/components/icons';
-import { colors, fonts, radius, spacing, type } from '../../src/theme';
 import { coords } from '../../src/lib/format';
+import { useWebTheme } from '../../src/web/webTheme';
+import { GlassButton, GlassErrorBanner, GlassOutlineButton, GlassScreen } from '../../src/web/webUi';
 
 /**
  * Time in / out.
@@ -21,6 +20,7 @@ import { coords } from '../../src/lib/format';
  */
 export default function PunchScreen() {
   const worker = useWorker();
+  const { palette } = useWebTheme();
   const params = useLocalSearchParams<{ type: string; projectId: string; projectName: string }>();
   const punchType = params.type === 'out' ? 'out' : 'in';
   const projectId = params.projectId;
@@ -112,115 +112,85 @@ export default function PunchScreen() {
   }
 
   return (
-    <ScreenBody>
-      <Text style={type.eyebrow}>{punchType === 'in' ? 'Clocking in' : 'Clocking out'}</Text>
-      <Text style={[type.greet, { marginBottom: spacing.xl }]}>{projectName}</Text>
-
-      {error ? <ErrorNote message={error} /> : null}
-
-      {/* --------------------------------- Selfie ------------------------ */}
-      <Text style={[type.label, { marginBottom: spacing.sm }]}>Selfie</Text>
-      {selfieUri ? (
-        <View style={s.previewWrap}>
-          <Image source={{ uri: selfieUri }} style={s.preview} resizeMode="cover" />
-          <SecondaryButton label="Retake selfie" onPress={takeSelfie} style={{ marginTop: 10 }} />
-        </View>
-      ) : (
-        <Pressable style={s.capture} onPress={takeSelfie}>
-          <CameraIcon size={26} color={colors.steel} />
-          <Text style={s.captureText}>Take selfie</Text>
-          <Text style={s.captureHint}>Front camera · you can retake before submitting</Text>
-        </Pressable>
-      )}
-
-      {/* ----------------------------------- GPS ------------------------- */}
-      <View style={s.gpsRow}>
-        <MapPinIcon size={18} color={colors.steel} />
-        <View style={{ flex: 1 }}>
-          <Text style={s.gpsTitle}>
-            {locating ? 'Getting your location…' : fix ? 'Location captured' : 'Location unavailable'}
-          </Text>
-          <Text style={s.gpsSub}>
-            {locating
-              ? 'Hold tight.'
-              : fix
-                ? coords(fix.lat, fix.lng)
-                : 'Your punch will still go through — your supervisor will just see no coordinates.'}
-          </Text>
-        </View>
-      </View>
-
-      {/* ----------------------------- Biometric note -------------------- */}
-      <View style={s.bioNote}>
-        <LockIcon size={20} color={colors.steel} />
-        <Text style={s.bioText}>
-          Submitting asks for{' '}
-          <Text style={s.bioStrong}>your phone's fingerprint, Face ID, or passcode</Text> before the
-          punch is saved.
+    <GlassScreen>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+        <Text style={{ fontSize: 11, letterSpacing: 1, color: palette.muted, fontWeight: '700' }}>
+          {punchType === 'in' ? 'Clocking in' : 'Clocking out'}
         </Text>
-      </View>
+        <Text style={{ fontSize: 22, fontWeight: '700', color: palette.text, marginTop: 3, marginBottom: 20 }}>
+          {projectName}
+        </Text>
 
-      <PrimaryButton
-        label={submitting ? 'Recording…' : `Confirm time ${punchType}`}
-        onPress={submit}
-        loading={submitting}
-        disabled={!selfieUri}
-      />
-      <SecondaryButton
-        label="Cancel"
-        onPress={() => router.back()}
-        style={{ marginTop: 10, marginBottom: 30 }}
-      />
-    </ScreenBody>
+        {error ? <GlassErrorBanner message={error} /> : null}
+
+        {/* --------------------------------- Selfie ------------------------ */}
+        <Text style={{ fontSize: 11, fontWeight: '700', color: palette.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
+          Selfie
+        </Text>
+        {selfieUri ? (
+          <View style={{ marginBottom: 20 }}>
+            <Image source={{ uri: selfieUri }} style={[s.preview, { backgroundColor: palette.panelSolid }]} resizeMode="cover" />
+            <GlassOutlineButton label="Retake selfie" onPress={takeSelfie} style={{ marginTop: 10 }} />
+          </View>
+        ) : (
+          <Pressable
+            style={[s.capture, { backgroundColor: palette.panel, borderColor: palette.border }]}
+            onPress={takeSelfie}
+          >
+            <CameraIcon size={26} color={palette.muted} />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text, marginTop: 4 }}>Take selfie</Text>
+            <Text style={{ fontSize: 11.5, color: palette.muted }}>Front camera · you can retake before submitting</Text>
+          </Pressable>
+        )}
+
+        {/* ----------------------------------- GPS ------------------------- */}
+        <View style={[s.row, { backgroundColor: palette.panel, borderColor: palette.border, marginBottom: 12 }]}>
+          <MapPinIcon size={18} color={palette.muted} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>
+              {locating ? 'Getting your location…' : fix ? 'Location captured' : 'Location unavailable'}
+            </Text>
+            <Text style={{ fontSize: 11.5, color: palette.muted, marginTop: 2, lineHeight: 16 }}>
+              {locating
+                ? 'Hold tight.'
+                : fix
+                  ? coords(fix.lat, fix.lng)
+                  : 'Your punch will still go through — your supervisor will just see no coordinates.'}
+            </Text>
+          </View>
+        </View>
+
+        {/* ----------------------------- Biometric note -------------------- */}
+        <View style={[s.row, { backgroundColor: palette.panel, borderColor: palette.border, marginBottom: 20 }]}>
+          <LockIcon size={20} color={palette.muted} />
+          <Text style={{ flex: 1, fontSize: 11.5, color: palette.muted, lineHeight: 17 }}>
+            Submitting asks for{' '}
+            <Text style={{ color: palette.text, fontWeight: '700' }}>your phone's fingerprint, Face ID, or passcode</Text> before the
+            punch is saved.
+          </Text>
+        </View>
+
+        <GlassButton
+          label={submitting ? 'Recording…' : `Confirm time ${punchType}`}
+          onPress={submit}
+          loading={submitting}
+          disabled={!selfieUri}
+        />
+        <GlassOutlineButton label="Cancel" onPress={() => router.back()} style={{ marginTop: 10 }} />
+      </ScrollView>
+    </GlassScreen>
   );
 }
 
 const s = StyleSheet.create({
   capture: {
-    backgroundColor: colors.card,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: colors.line,
-    borderRadius: radius.hero,
+    borderRadius: 20,
     paddingVertical: 36,
     alignItems: 'center',
-    gap: 6,
-    marginBottom: spacing.xl,
+    marginBottom: 20,
   },
-  captureText: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink, marginTop: 4 },
-  captureHint: { fontSize: 11.5, color: colors.muted, fontFamily: fonts.body },
-  previewWrap: { marginBottom: spacing.xl },
-  preview: {
-    width: '100%',
-    height: 300,
-    borderRadius: radius.hero,
-    backgroundColor: colors.steel,
-  },
-  gpsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.lg,
-    padding: 14,
-    marginBottom: spacing.md,
-  },
-  gpsTitle: { fontSize: 13, fontFamily: fonts.bodyBold, color: colors.ink },
-  gpsSub: { fontSize: 11.5, color: colors.muted, marginTop: 2, lineHeight: 16, fontFamily: fonts.body },
-  bioNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.line,
-    borderRadius: radius.lg,
-    padding: 13,
-    marginBottom: spacing.xl,
-  },
-  bioText: { flex: 1, fontSize: 11.5, color: colors.muted, lineHeight: 17, fontFamily: fonts.body },
-  bioStrong: { color: colors.ink, fontFamily: fonts.bodySemi },
+  preview: { width: '100%', height: 300, borderRadius: 20 },
+  row: { flexDirection: 'row', gap: 10, alignItems: 'center', borderWidth: 1, borderRadius: 14, padding: 14 },
 });

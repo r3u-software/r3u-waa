@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useSession, useWorker } from '../../../src/lib/session';
 import { useAsync } from '../../../src/lib/useAsync';
@@ -9,16 +10,7 @@ import {
   fetchWorkerLeaveRequests,
   fetchWorkerTimeEntries,
 } from '../../../src/lib/queries';
-import { ScreenBody, TopBar } from '../../../src/components/Screen';
-import {
-  Card,
-  EmptyState,
-  ListCard,
-  Loader,
-  Pill,
-  Section,
-  StatusStrip,
-} from '../../../src/components/ui';
+import { EmptyState, Pill } from '../../../src/components/ui';
 import {
   CalendarIcon,
   CashIcon,
@@ -30,12 +22,24 @@ import {
   SiteGlyph,
   UserIcon,
 } from '../../../src/components/icons';
-import { colors, fonts, radius, spacing, toneForStatus, type } from '../../../src/theme';
+import { toneForStatus } from '../../../src/theme';
 import { currentCutoff, longDate, peso, relativeStamp, timeOfDay } from '../../../src/lib/format';
+import { useWebTheme } from '../../../src/web/webTheme';
+import {
+  GlassButton,
+  GlassCard,
+  GlassListRow,
+  GlassOutlineButton,
+  GlassScreen,
+  MetricCard,
+  webToneFor,
+} from '../../../src/web/webUi';
 
 export default function WorkerHome() {
   const worker = useWorker();
   const { refreshProfile } = useSession();
+  const { palette } = useWebTheme();
+  const insets = useSafeAreaInsets();
   const [siteModal, setSiteModal] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
@@ -132,178 +136,136 @@ export default function WorkerHome() {
   const profileIncomplete = worker.status !== 'complete';
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.paper }}>
-      <TopBar label="Attendance" />
-      <ScreenBody
+    <GlassScreen>
+      <ScrollBody
+        insetsTop={insets.top}
         refreshing={loading}
         onRefresh={() => {
           reload();
           refreshProfile();
         }}
       >
-        <Text style={type.eyebrow}>{longDate()}</Text>
-        <Text style={type.greet}>Hey, {worker.full_name.split(' ')[0]}</Text>
-        <Text style={[type.subgreet, { marginBottom: spacing.xl }]}>
+        <Text style={{ fontSize: 11, letterSpacing: 1, color: palette.muted, fontWeight: '700' }}>
+          {longDate()}
+        </Text>
+        <Text style={{ fontSize: 24, fontWeight: '700', color: palette.text, marginTop: 3 }}>
+          Hey, {worker.full_name.split(' ')[0]}
+        </Text>
+        <Text style={{ fontSize: 13, color: palette.muted, marginTop: 3, marginBottom: 18 }}>
           {profileIncomplete ? 'Profile incomplete · finish onboarding' : 'Profile complete · Verified'}
         </Text>
 
         {profileIncomplete ? (
-          <Card
-            style={s.alert}
-            onPress={() => router.push('/(worker)/onboarding')}
-          >
-            <Text style={s.alertTitle}>Finish your profile</Text>
-            <Text style={s.alertBody}>
+          <GlassCard onPress={() => router.push('/(worker)/onboarding')} style={{ marginBottom: 16, borderColor: palette.accent }}>
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>Finish your profile</Text>
+            <Text style={{ fontSize: 12, color: palette.muted, lineHeight: 17, marginTop: 3 }}>
               Add your face scan and a valid ID so your punches can be verified. Tap to continue.
             </Text>
-          </Card>
+          </GlassCard>
         ) : null}
 
-        <StatusStrip
-          chips={[
-            { value: stats.days, label: 'Days this cutoff', tone: 'ok' },
-            { value: stats.pending, label: 'Pending review', tone: 'pending' },
-            { value: stats.flagged, label: 'Flagged', tone: 'warn' },
-          ]}
-        />
+        <View style={s.statRow}>
+          <MetricCard style={s.statItem} label="Days this cutoff" value={String(stats.days)} trendPct={null} />
+          <MetricCard style={s.statItem} label="Pending review" value={String(stats.pending)} trendPct={null} />
+          <MetricCard style={s.statItem} label="Flagged" value={String(stats.flagged)} trendPct={null} />
+        </View>
 
         {/* ---------------------------- Punch card hero ------------------- */}
-        <View style={s.punchCard}>
-          <View style={s.glow} />
-          <Text style={s.siteLbl}>Working today at</Text>
+        <GlassCard style={{ marginBottom: 16, padding: 20 }}>
+          <Text style={{ fontSize: 10.5, letterSpacing: 1, color: palette.muted, fontWeight: '700', marginBottom: 9 }}>
+            WORKING TODAY AT
+          </Text>
           <Pressable
-            style={s.siteSelect}
+            style={[s.siteSelect, { backgroundColor: palette.hover, borderColor: palette.border }]}
             onPress={() => setSiteModal(true)}
             disabled={assignments.length === 0}
           >
-            <View style={s.siteSelectLeft}>
-              <Text style={s.siteName} numberOfLines={1}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
+              <Text style={{ color: palette.text, fontSize: 14.5, fontWeight: '700', flexShrink: 1 }} numberOfLines={1}>
                 {selected?.project?.name ?? 'No site assigned'}
               </Text>
               {isBorrowed ? (
-                <View style={s.tag}>
-                  <Text style={s.tagText}>Borrowed</Text>
+                <View style={{ backgroundColor: palette.accent, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 }}>
+                  <Text style={{ fontSize: 10, color: '#fff', fontWeight: '700', letterSpacing: 0.3 }}>Borrowed</Text>
                 </View>
               ) : null}
             </View>
-            <ChevronDownIcon size={14} color="#fff" />
+            <ChevronDownIcon size={14} color={palette.muted} />
           </Pressable>
 
           <View style={s.punchRow}>
-            <Pressable
-              style={[s.punchBtn, s.punchIn]}
-              onPress={() => goPunch('in')}
-              disabled={!selected}
-            >
-              <PlusIcon size={20} color={colors.ink} />
-              <Text style={s.punchInText}>Time In</Text>
-            </Pressable>
-            <Pressable
-              style={[s.punchBtn, s.punchOut]}
-              onPress={() => goPunch('out')}
-              disabled={!selected}
-            >
-              <ExitIcon size={20} color="#fff" />
-              <Text style={s.punchOutText}>Time Out</Text>
-            </Pressable>
+            <GlassButton label="Time In" onPress={() => goPunch('in')} disabled={!selected} style={{ flex: 1 }} />
+            <GlassOutlineButton label="Time Out" onPress={() => goPunch('out')} disabled={!selected} style={{ flex: 1 }} />
           </View>
 
-          <View style={s.punchMeta}>
-            <Text style={s.metaText}>
-              Last punch:{' '}
-              <Text style={s.metaStrong}>
-                {lastPunch ? timeOfDay(lastPunch.entry_timestamp) : '—'}
-              </Text>
+          <View style={[s.punchMeta, { borderTopColor: palette.border }]}>
+            <Text style={{ fontSize: 11.5, color: palette.muted, flexShrink: 1 }}>
+              Last punch: <Text style={{ color: palette.text, fontWeight: '700' }}>{lastPunch ? timeOfDay(lastPunch.entry_timestamp) : '—'}</Text>
             </Text>
-            <Text style={s.metaText} numberOfLines={1}>
+            <Text style={{ fontSize: 11.5, color: palette.muted, flexShrink: 1 }} numberOfLines={1}>
               {selected?.project?.location ?? 'Location on file'}
             </Text>
           </View>
-        </View>
+        </GlassCard>
 
-        <View style={s.bioNote}>
-          <LockIcon size={20} color={colors.steel} />
-          <Text style={s.bioText}>
-            Every punch needs a selfie + <Text style={s.bioStrong}>your phone's fingerprint or passcode</Text> to
+        <View style={[s.bioNote, { backgroundColor: palette.panel, borderColor: palette.border }]}>
+          <LockIcon size={20} color={palette.muted} />
+          <Text style={{ flex: 1, fontSize: 11.5, color: palette.muted, lineHeight: 17 }}>
+            Every punch needs a selfie + <Text style={{ color: palette.text, fontWeight: '700' }}>your phone's fingerprint or passcode</Text> to
             confirm it's really you clocking in.
           </Text>
         </View>
 
         {/* ------------------------------ Quick actions ------------------- */}
-        <Section title="Quick actions">
-          <View style={s.quickGrid}>
-            <QuickItem
-              icon={<CashIcon size={16} color={colors.steel} />}
-              label="Cash advance"
-              onPress={() => router.push('/(worker)/cash-advance')}
-            />
-            <QuickItem
-              icon={<CalendarIcon size={16} color={colors.steel} />}
-              label="File leave"
-              onPress={() => router.push('/(worker)/leave')}
-            />
-            <QuickItem
-              icon={<CurrencyIcon size={16} color={colors.steel} />}
-              label="Cutoff pay"
-              onPress={() => router.push('/(worker)/(tabs)/pay')}
-            />
-            <QuickItem
-              icon={<UserIcon size={16} color={colors.steel} />}
-              label="My profile"
-              onPress={() => router.push('/(worker)/(tabs)/profile')}
-            />
-          </View>
-        </Section>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text, marginBottom: 10 }}>Quick actions</Text>
+        <View style={s.quickGrid}>
+          <QuickItem icon={<CashIcon size={16} color={palette.text} />} label="Cash advance" onPress={() => router.push('/(worker)/cash-advance')} />
+          <QuickItem icon={<CalendarIcon size={16} color={palette.text} />} label="File leave" onPress={() => router.push('/(worker)/leave')} />
+          <QuickItem icon={<CurrencyIcon size={16} color={palette.text} />} label="Cutoff pay" onPress={() => router.push('/(worker)/(tabs)/pay')} />
+          <QuickItem icon={<UserIcon size={16} color={palette.text} />} label="My profile" onPress={() => router.push('/(worker)/(tabs)/profile')} />
+        </View>
 
         {/* ---------------------------- Recent activity ------------------- */}
-        <Section
-          title="Recent activity"
-          link="See all"
-          onLinkPress={() => router.push('/(worker)/(tabs)/activity')}
-        >
-          {loading && activity.length === 0 ? (
-            <Loader />
-          ) : activity.length === 0 ? (
-            <EmptyState
-              title="Nothing yet"
-              body="Your punches and requests will show up here once you start."
-            />
-          ) : (
-            activity.map((item) => {
-              const tone = toneForStatus(item.status);
-              const bg =
-                tone === 'ok' ? colors.okBg : tone === 'pending' ? colors.pendingBg : tone === 'warn' ? colors.warnBg : colors.neutralBg;
-              const fg =
-                tone === 'ok' ? colors.ok : tone === 'pending' ? colors.safetyDeep : tone === 'warn' ? colors.warn : colors.muted;
-              return (
-                <ListCard
-                  key={item.key}
-                  iconBg={bg}
-                  icon={
-                    item.kind === 'punch' ? (
-                      <SiteGlyph size={17} color={fg} />
-                    ) : item.kind === 'advance' ? (
-                      <CashIcon size={17} color={fg} />
-                    ) : (
-                      <CalendarIcon size={17} color={fg} />
-                    )
-                  }
-                  title={item.title}
-                  subtitle={item.sub}
-                  tone={tone}
-                  pillLabel={item.status}
-                />
-              );
-            })
-          )}
-        </Section>
-      </ScreenBody>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 22, marginBottom: 10 }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text }}>Recent activity</Text>
+          <Pressable onPress={() => router.push('/(worker)/(tabs)/activity')} hitSlop={8}>
+            <Text style={{ fontSize: 11.5, color: palette.accent2, fontWeight: '700' }}>See all</Text>
+          </Pressable>
+        </View>
+        {activity.length === 0 ? (
+          <EmptyState title="Nothing yet" body="Your punches and requests will show up here once you start." />
+        ) : (
+          activity.map((item) => {
+            const tone = webToneFor(toneForStatus(item.status));
+            return (
+              <GlassListRow
+                key={item.key}
+                icon={
+                  item.kind === 'punch' ? (
+                    <SiteGlyph size={17} color={palette.text} />
+                  ) : item.kind === 'advance' ? (
+                    <CashIcon size={17} color={palette.text} />
+                  ) : (
+                    <CalendarIcon size={17} color={palette.text} />
+                  )
+                }
+                title={item.title}
+                subtitle={item.sub}
+                tone={tone}
+                pillLabel={item.status}
+              />
+            );
+          })
+        )}
+      </ScrollBody>
 
       {/* ------------------------------- Site picker --------------------- */}
       <Modal visible={siteModal} transparent animationType="slide" onRequestClose={() => setSiteModal(false)}>
         <Pressable style={s.backdrop} onPress={() => setSiteModal(false)}>
-          <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={s.sheetTitle}>Where are you working today?</Text>
+          <Pressable style={[s.sheet, { backgroundColor: palette.panelSolid, borderColor: palette.border }]} onPress={(e) => e.stopPropagation()}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: palette.text, marginBottom: 12 }}>
+              Where are you working today?
+            </Text>
             {assignments.length === 0 ? (
               <EmptyState title="No sites assigned" body="Ask your supervisor to assign you to a site." />
             ) : (
@@ -312,16 +274,19 @@ export default function WorkerHome() {
                 return (
                   <Pressable
                     key={a.id}
-                    style={[s.sheetRow, active && s.sheetRowActive]}
+                    style={[
+                      s.sheetRow,
+                      { backgroundColor: palette.panel, borderColor: active ? palette.accent : palette.border, borderWidth: active ? 2 : 1 },
+                    ]}
                     onPress={() => {
                       setSelectedProjectId(a.project_id);
                       setSiteModal(false);
                     }}
                   >
                     <View style={{ flex: 1 }}>
-                      <Text style={s.sheetRowName}>{a.project?.name ?? 'Site'}</Text>
+                      <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>{a.project?.name ?? 'Site'}</Text>
                       {a.project?.location ? (
-                        <Text style={s.sheetRowSub}>{a.project.location}</Text>
+                        <Text style={{ fontSize: 11.5, color: palette.muted, marginTop: 2 }}>{a.project.location}</Text>
                       ) : null}
                     </View>
                     {a.is_primary ? <Pill label="Primary" tone="muted" /> : <Pill label="Borrowed" tone="pending" />}
@@ -332,167 +297,95 @@ export default function WorkerHome() {
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </GlassScreen>
   );
 }
 
-function QuickItem({
-  icon,
-  label,
-  onPress,
+/** Plain ScrollView with the safe-area top padding this screen used to get
+ * from the shared `TopBar` (not used here — see the comment on `WorkerHome`
+ * above) and a `RefreshControl` matching `ScreenBody`'s. */
+function ScrollBody({
+  insetsTop,
+  refreshing,
+  onRefresh,
+  children,
 }: {
-  icon: React.ReactNode;
-  label: string;
-  onPress: () => void;
+  insetsTop: number;
+  refreshing?: boolean;
+  onRefresh?: () => void;
+  children: React.ReactNode;
 }) {
+  const { palette } = useWebTheme();
   return (
-    <Pressable style={({ pressed }) => [s.quickItem, pressed && { opacity: 0.7 }]} onPress={onPress}>
-      <View style={s.quickIcon}>{icon}</View>
-      <Text style={s.quickLabel}>{label}</Text>
-    </Pressable>
+    <ScrollView
+      contentContainerStyle={{ padding: 20, paddingTop: insetsTop + 20, paddingBottom: 40 }}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={
+        onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={palette.muted} /> : undefined
+      }
+    >
+      {children}
+    </ScrollView>
+  );
+}
+
+function QuickItem({ icon, label, onPress }: { icon: React.ReactNode; label: string; onPress: () => void }) {
+  const { palette } = useWebTheme();
+  return (
+    <GlassCard onPress={onPress} style={s.quickItem}>
+      <View style={{ width: 34, height: 34, borderRadius: 9, backgroundColor: palette.hover, alignItems: 'center', justifyContent: 'center' }}>
+        {icon}
+      </View>
+      <Text style={{ fontSize: 10.5, fontWeight: '700', textAlign: 'center', color: palette.text, lineHeight: 13, marginTop: 7 }}>
+        {label}
+      </Text>
+    </GlassCard>
   );
 }
 
 const s = StyleSheet.create({
-  alert: { backgroundColor: colors.pendingBg, borderColor: colors.safety, gap: 3 },
-  alertTitle: { fontFamily: fonts.bodyBold, fontSize: 13.5, color: colors.ink },
-  alertBody: { fontSize: 12, color: colors.safetyDeep, lineHeight: 17, fontFamily: fonts.body },
-
-  punchCard: {
-    backgroundColor: colors.ink,
-    borderRadius: radius.hero,
-    padding: spacing.xl,
-    marginBottom: 22,
-    overflow: 'hidden',
-  },
-  glow: {
-    position: 'absolute',
-    top: -40,
-    right: -40,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(242,169,59,0.14)',
-  },
-  siteLbl: {
-    fontSize: 10.5,
-    letterSpacing: 1,
-    color: colors.mutedOnDark,
-    marginBottom: spacing.sm,
-    fontFamily: fonts.bodySemi,
-  },
+  statRow: { flexDirection: 'row', gap: 9, marginBottom: 16 },
+  statItem: { flex: 1, padding: 12 },
   siteSelect: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    borderRadius: radius.md,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 18,
+    marginBottom: 16,
     gap: 8,
   },
-  siteSelectLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 },
-  siteName: { color: '#fff', fontSize: 14.5, fontFamily: fonts.bodySemi, flexShrink: 1 },
-  tag: { backgroundColor: colors.safety, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 },
-  tagText: { fontSize: 10, color: colors.ink, fontFamily: fonts.bodyBold, letterSpacing: 0.3 },
   punchRow: { flexDirection: 'row', gap: 10 },
-  punchBtn: {
-    flex: 1,
-    borderRadius: radius.lg,
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  punchIn: { backgroundColor: colors.safety },
-  punchOut: { borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)' },
-  punchInText: { color: colors.ink, fontFamily: fonts.bodyBold, fontSize: 14 },
-  punchOutText: { color: '#fff', fontFamily: fonts.bodyBold, fontSize: 14 },
   punchMeta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: spacing.lg,
+    marginTop: 16,
     paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.12)',
     gap: 10,
   },
-  metaText: { fontSize: 11.5, color: colors.mutedOnDark, fontFamily: fonts.body, flexShrink: 1 },
-  metaStrong: { color: '#fff', fontFamily: fonts.bodySemi },
-
   bioNote: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: colors.card,
     borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.line,
-    borderRadius: radius.lg,
+    borderRadius: 14,
     padding: 13,
     marginBottom: 22,
   },
-  bioText: { flex: 1, fontSize: 11.5, color: colors.muted, lineHeight: 17, fontFamily: fonts.body },
-  bioStrong: { color: colors.ink, fontFamily: fonts.bodySemi },
-
-  quickGrid: { flexDirection: 'row', gap: 10 },
-  quickItem: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.xl,
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    alignItems: 'center',
-    gap: 7,
-  },
-  quickIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    backgroundColor: colors.paper,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickLabel: {
-    fontSize: 10.5,
-    fontFamily: fonts.bodySemi,
-    textAlign: 'center',
-    color: colors.ink,
-    lineHeight: 13,
-  },
-
-  backdrop: { flex: 1, backgroundColor: 'rgba(28,27,24,0.5)', justifyContent: 'flex-end' },
+  quickGrid: { flexDirection: 'row', gap: 10, marginBottom: 8 },
+  quickItem: { flex: 1, paddingVertical: 14, paddingHorizontal: 4, alignItems: 'center' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: colors.paper,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
-    padding: spacing.xl,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    padding: 20,
     paddingBottom: 40,
     gap: 10,
   },
-  sheetTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 19,
-    fontWeight: '700',
-    color: colors.ink,
-    marginBottom: 6,
-  },
-  sheetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.lg,
-    padding: 14,
-  },
-  sheetRowActive: { borderColor: colors.safety, borderWidth: 2 },
-  sheetRowName: { fontSize: 13.5, fontFamily: fonts.bodyBold, color: colors.ink },
-  sheetRowSub: { fontSize: 11.5, color: colors.muted, marginTop: 2, fontFamily: fonts.body },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 14 },
 });
