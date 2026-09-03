@@ -133,7 +133,8 @@ export default function WorkerHome() {
     });
   }
 
-  const profileIncomplete = worker.status !== 'complete';
+  const profileIncomplete = worker.status === 'incomplete';
+  const profilePending = worker.status === 'pending';
 
   return (
     <GlassScreen>
@@ -152,14 +153,25 @@ export default function WorkerHome() {
           Hey, {worker.full_name.split(' ')[0]}
         </Text>
         <Text style={{ fontSize: 13, color: palette.muted, marginTop: 3, marginBottom: 18 }}>
-          {profileIncomplete ? 'Profile incomplete · finish onboarding' : 'Profile complete · Verified'}
+          {profileIncomplete
+            ? 'Profile incomplete · finish onboarding'
+            : profilePending
+              ? 'Profile submitted · awaiting supervisor review'
+              : 'Profile complete · Verified'}
         </Text>
 
         {profileIncomplete ? (
           <GlassCard onPress={() => router.push('/(worker)/onboarding')} style={{ marginBottom: 16, borderColor: palette.accent }}>
             <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>Finish your profile</Text>
             <Text style={{ fontSize: 12, color: palette.muted, lineHeight: 17, marginTop: 3 }}>
-              Add your face scan and a valid ID so your punches can be verified. Tap to continue.
+              Add your name, a face scan, and a valid ID so your punches can be verified. Tap to continue.
+            </Text>
+          </GlassCard>
+        ) : profilePending ? (
+          <GlassCard onPress={() => router.push('/(worker)/onboarding')} style={{ marginBottom: 16, borderColor: palette.info }}>
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>Awaiting supervisor review</Text>
+            <Text style={{ fontSize: 12, color: palette.muted, lineHeight: 17, marginTop: 3 }}>
+              Your name, face scan, and ID are submitted and locked until your supervisor decides.
             </Text>
           </GlassCard>
         ) : null}

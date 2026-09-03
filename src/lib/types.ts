@@ -9,7 +9,11 @@
  */
 
 export type RequestStatus = 'pending' | 'approved' | 'declined';
-export type WorkerStatus = 'incomplete' | 'complete';
+/** 'pending' sits between the other two: full_name + face_scan_url +
+ * valid_id_url are all on file, awaiting the supervisor's approve/reject
+ * decision (`reviewWorkerProfile`) — the worker cannot edit any of those
+ * three while pending (enforced server-side, not just in the UI). */
+export type WorkerStatus = 'incomplete' | 'pending' | 'complete';
 export type PunchType = 'in' | 'out';
 export type RecipientType = 'worker' | 'supervisor' | 'hr_admin';
 
@@ -118,6 +122,11 @@ export interface WaaWorker {
    * `phone` stays as a real contact field and a legacy sign-in fallback,
    * never shown as "the login" anywhere in the UI any more. */
   login_code: string;
+  /** Set by `reviewWorkerProfile` on a reject; cleared on the next
+   * completed resubmission. Null the rest of the time. */
+  profile_rejected_reason: string | null;
+  profile_reviewed_at: string | null;
+  profile_reviewed_by: string | null;
 }
 
 export interface WaaAssignment {

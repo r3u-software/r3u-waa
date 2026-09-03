@@ -8,17 +8,20 @@ import {
   fetchPendingCashAdvances,
   fetchPendingLeaveRequests,
   fetchPendingTimeEntries,
+  fetchRoster,
+  reviewWorkerProfile,
 } from '../../../src/lib/queries';
 import { EmptyState } from '../../../src/components/ui';
 import {
   CashAdvanceNoticeCard,
+  ProfileApprovalCard,
   PunchApprovalCard,
   RequestApprovalCard,
 } from '../../../src/components/approvals';
 import { useWebTheme } from '../../../src/web/webTheme';
 import { Chip, GlassPullScreen } from '../../../src/web/webUi';
 
-type Queue = 'punches' | 'advances' | 'leave';
+type Queue = 'punches' | 'advances' | 'leave' | 'profiles';
 
 /** The full pending queues — same approve/decline pattern as the dashboard. */
 export default function ApprovalsScreen() {
@@ -28,12 +31,13 @@ export default function ApprovalsScreen() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const { data, loading, reload } = useAsync(async () => {
-    const [punches, advances, leaves] = await Promise.all([
+    const [punches, advances, leaves, roster] = await Promise.all([
       fetchPendingTimeEntries(),
       fetchPendingCashAdvances(),
       fetchPendingLeaveRequests(),
+      fetchRoster(),
     ]);
-    return { punches, advances, leaves };
+    return { punches, advances, leaves, profiles: roster.filter((w) => w.status === 'pending') };
   }, [supervisor.id]);
 
   async function decide(fn: () => Promise<void>, id: string) {
@@ -50,6 +54,7 @@ export default function ApprovalsScreen() {
 
   const tabs: { key: Queue; label: string; count: number }[] = [
     { key: 'punches', label: 'Punches', count: data?.punches.length ?? 0 },
+    { key: 'profiles', label: 'Profiles', count: data?.profiles.length ?? 0 },
     { key: 'advances', label: 'Advances', count: data?.advances.length ?? 0 },
     { key: 'leave', label: 'Leave', count: data?.leaves.length ?? 0 },
   ];
@@ -86,6 +91,25 @@ export default function ApprovalsScreen() {
                 entry={e}
                 busy={busyId === e.id}
                 onDecide={(d) => decide(() => decideTimeEntry(e.id, d, supervisor.id), e.id)}
+              />
+            ))
+          )}
+        </View>
+      ) : queue === 'profiles' ? (
+        <View>
+          <SectionTitle>Identity submissions</SectionTitle>
+          {(data?.profiles.length ?? 0) === 0 ? (
+            <EmptyState
+              title="Nothing to review"
+              body="A worker's name, face scan, and ID land here together, once all three are on file."
+            />
+          ) : (
+            data!.profiles.map((w) => (
+              <ProfileApprovalCard
+                key={w.id}
+                worker={w}
+                busy={busyId === w.id}
+                onDecide={(d, r) => decide(() => reviewWorkerProfile(w.id, d === 'approve' ? 'approve' : 'reject', r), w.id)}
               />
             ))
           )}

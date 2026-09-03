@@ -1,5 +1,5 @@
-import React from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, ViewStyle } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Line, LinearGradient, Polygon, Polyline, Stop } from 'react-native-svg';
 import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
@@ -7,6 +7,15 @@ import { BlurView } from 'expo-blur';
 import { useWebTheme, webOnlyStyle, WEB_THEMES, WebModePref, WebPalette } from './webTheme';
 import { MonitorIcon, MoonIcon, SunIcon } from '../components/icons';
 import { initialsOf } from '../lib/format';
+import { SignedImage } from '../components/SignedImage';
+import type { WaaBucket } from '../lib/types';
+import {
+  biometricLoginSupported,
+  clearBiometricSession,
+  enableBiometricLogin,
+  isBiometricAvailable,
+  loadBiometricSession,
+} from '../lib/biometricAuth';
 
 /**
  * Presentational primitives for the HR/Admin + Platform Owner web dashboard —
@@ -447,18 +456,35 @@ export function GlassListRow({
  * every worker/supervisor-listing table or row needs. Originally local to
  * `(hr)/roster.tsx`; promoted here once Supervisor's own Roster/Team/Home
  * screens needed the exact same cell. */
-export function WorkerCell({ name, sub }: { name: string; sub?: string }) {
+export function WorkerCell({
+  name,
+  sub,
+  photoBucket,
+  photoPath,
+}: {
+  name: string;
+  sub?: string;
+  /** Pass both only once the subject is actually approved — callers decide
+   * that (`status === 'complete'`), not this component. Omit either to fall
+   * back to the gradient-initials mark, same as before. */
+  photoBucket?: WaaBucket;
+  photoPath?: string | null;
+}) {
   const { palette } = useWebTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-      <ExpoLinearGradient
-        colors={[palette.accent, palette.accent2]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }}
-      >
-        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 11 }}>{initialsOf(name)}</Text>
-      </ExpoLinearGradient>
+      {photoBucket && photoPath ? (
+        <SignedImage bucket={photoBucket} path={photoPath} size={30} radius={9} />
+      ) : (
+        <ExpoLinearGradient
+          colors={[palette.accent, palette.accent2]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 11 }}>{initialsOf(name || '?')}</Text>
+        </ExpoLinearGradient>
+      )}
       <View style={{ minWidth: 0 }}>
         <Text style={{ fontSize: 12.5, fontWeight: '700', color: palette.text }} numberOfLines={1}>
           {name}
@@ -639,6 +665,87 @@ export function ColorThemeSwitcher({ compact = false }: { compact?: boolean }) {
         );
       })}
     </View>
+  );
+}
+
+/**
+ * "Quick sign-in" toggle for Profile's "Sign-in & Security" section —
+ * replaces the old post-login nag Alert entirely. Turning it ON confirms
+ * with one biometric/passcode prompt (proving the person present is who
+ * they claim to be) and stores the *current* session's refresh token;
+ * turning it OFF forgets it. Renders nothing on web or on a device with no
+ * biometric hardware at all — there is nothing to toggle there.
+ */
+export function BiometricToggle({ identifierLabel }: { identifierLabel: string }) {
+  const { palette } = useWebTheme();
+  const [ready, setReady] = useState(false);
+  const [supported, setSupported] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!biometricLoginSupported()) {
+        if (active) setReady(true);
+        return;
+      }
+      const [available, record] = await Promise.all([isBiometricAvailable(), loadBiometricSession()]);
+      if (!active) return;
+      setSupported(available);
+      setEnabled(!!record && record.identifierLabel === identifierLabel);
+      setReady(true);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [identifierLabel]);
+
+  // Nothing rendered at all when unsupported — web, or a device with no
+  // biometric hardware enrolled — not even the section heading, so a
+  // profile screen that drops this in never shows an empty "Sign-in &
+  // security" card with nothing inside it.
+  if (!ready || !supported) return null;
+
+  async function onToggle(next: boolean) {
+    setBusy(true);
+    try {
+      if (next) {
+        const ok = await enableBiometricLogin(identifierLabel);
+        setEnabled(ok);
+        if (!ok) {
+          Alert.alert('Could not enable', 'Confirm with your fingerprint, face, or passcode to turn this on.');
+        }
+      } else {
+        await clearBiometricSession();
+        setEnabled(false);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <WebSection title="Sign-in & security">
+      <GlassCard>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>Quick sign-in</Text>
+            <Text style={{ fontSize: 11.5, color: palette.muted, marginTop: 2, lineHeight: 16 }}>
+              Use your fingerprint, face, or phone passcode on this device instead of typing your
+              password every time.
+            </Text>
+          </View>
+          <Switch
+            value={enabled}
+            onValueChange={onToggle}
+            disabled={busy}
+            trackColor={{ false: palette.border, true: palette.accent2 }}
+            thumbColor="#fff"
+          />
+        </View>
+      </GlassCard>
+    </WebSection>
   );
 }
 

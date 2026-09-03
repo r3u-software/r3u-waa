@@ -181,9 +181,14 @@ export async function submitLeaveRequest(input: {
  * Worker self-service profile edit. The worker may correct the name/phone the
  * supervisor typed, and set their own face scan / valid ID.
  *
- * `status` flips to 'complete' only once BOTH the face scan and the valid ID
- * are on file — matching the brief's rule that the flag is derived, never
- * set by hand.
+ * `status` moves to 'pending' — not straight to 'complete' — the instant the
+ * name, face scan, and valid ID are all on file; a supervisor has to approve
+ * it from there (`reviewWorkerProfile`). Once status leaves 'incomplete', a
+ * DB trigger (`waa_protect_sensitive_columns`) blocks the worker from
+ * touching these same columns again until that review lands — this call
+ * will throw with a clear message if attempted while already pending, but
+ * the real gate is meant to be the UI disabling those controls first (see
+ * `ProfileEditor.tsx`).
  */
 export async function updateWorkerProfile(
   workerId: string,
@@ -191,11 +196,27 @@ export async function updateWorkerProfile(
   current: WaaWorker
 ): Promise<WaaWorker> {
   const merged = { ...current, ...patch };
-  const complete = Boolean(merged.face_scan_url && merged.valid_id_url);
+  // Only recompute `status` when this patch actually touches one of the
+  // three gated identity fields. A phone-only save (the one field this
+  // function still lets through while pending/complete) must NOT flip an
+  // already-`complete` worker back to `pending` just because it happens to
+  // still satisfy "all three present" — that would silently re-open review
+  // on an account nothing about the identity actually changed.
+  const touchesIdentity = 'full_name' in patch || 'face_scan_url' in patch || 'valid_id_url' in patch;
+  const complete = Boolean(merged.full_name?.trim() && merged.face_scan_url && merged.valid_id_url);
 
   const res = await supabase
     .from('waa_workers')
-    .update({ ...patch, status: complete ? 'complete' : 'incomplete' })
+    .update({
+      ...patch,
+      ...(touchesIdentity
+        ? {
+            status: complete ? 'pending' : 'incomplete',
+            // A fresh submission supersedes whatever a previous rejection said.
+            ...(complete ? { profile_rejected_reason: null } : null),
+          }
+        : null),
+    })
     .eq('id', workerId)
     .select()
     .single();
@@ -598,6 +619,26 @@ export async function setWorkerContract(workerId: string, contractPath: string) 
  * temp password, and inserts the worker + primary assignment rows.
  * The returned credentials are shown once and are not retrievable afterward.
  */
+/**
+ * Approve or reject a worker's pending identity submission (full_name +
+ * face_scan_url + valid_id_url — see `updateWorkerProfile`'s doc comment
+ * below). Service-role only server-side: `waa_workers`' identity columns are
+ * locked to everyone else once status leaves 'incomplete', so this edge
+ * function is the only path either decision can take. Reject permanently
+ * deletes the uploaded face scan and valid ID from Storage and clears the
+ * name — deliberate, not a bug, per the brief's anti-fraud requirement.
+ */
+export async function reviewWorkerProfile(
+  workerId: string,
+  decision: 'approve' | 'reject',
+  remarks?: string
+): Promise<void> {
+  const { error } = await supabase.functions.invoke('waa-supervisor-review-worker-profile', {
+    body: { worker_id: workerId, decision, remarks },
+  });
+  if (error) throw new Error(await edgeErrorMessage(error, 'Could not save that decision.'));
+}
+
 export async function registerWorker(input: {
   full_name: string;
   phone: string;

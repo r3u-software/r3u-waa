@@ -127,7 +127,14 @@ export default function RosterScreen() {
                   columns={cols}
                   onPress={() => router.push(`/(supervisor)/worker/${w.id}`)}
                   values={{
-                    worker: <WorkerCell name={w.full_name} sub={w.phone || 'No phone on file'} />,
+                    worker: (
+                      <WorkerCell
+                        name={w.full_name}
+                        sub={w.phone || 'No phone on file'}
+                        photoBucket="waa-selfies"
+                        photoPath={w.status === 'complete' ? w.face_scan_url : null}
+                      />
+                    ),
                     site: (
                       <View>
                         <Text style={{ fontSize: 12.5, color: palette.text }}>{primary?.project?.name ?? 'No site'}</Text>

@@ -36,6 +36,7 @@ import {
 } from '../../../src/lib/queries';
 import { toneForStatus } from '../../../src/theme';
 import { initialsOf, peso, relativeStamp } from '../../../src/lib/format';
+import { SignedImage } from '../../../src/components/SignedImage';
 import { useWebTheme } from '../../../src/web/webTheme';
 import {
   GlassButton,
@@ -147,14 +148,20 @@ export default function HrWorkerDetail() {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={palette.muted} />}
       >
         <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center', marginBottom: 20 }}>
-          <LinearGradient
-            colors={[palette.accent, palette.accent2]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{ width: 58, height: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 19 }}>{initialsOf(worker.full_name)}</Text>
-          </LinearGradient>
+          {/* A real photo once approved stands in for the initials mark —
+              confirms this is the actual verified person at a glance. */}
+          {worker.status === 'complete' && worker.face_scan_url ? (
+            <SignedImage bucket="waa-selfies" path={worker.face_scan_url} size={58} radius={16} />
+          ) : (
+            <LinearGradient
+              colors={[palette.accent, palette.accent2]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ width: 58, height: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 19 }}>{initialsOf(worker.full_name || '?')}</Text>
+            </LinearGradient>
+          )}
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>{worker.full_name}</Text>
             <Text style={{ fontSize: 13, color: palette.muted }}>{worker.phone || 'No phone on file'}</Text>

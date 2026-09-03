@@ -10,7 +10,7 @@ import { ScreenBody, TopBar } from '../../../src/components/Screen';
 import { Card, Loader, Section, SecondaryButton, StatusStrip } from '../../../src/components/ui';
 import { colors, fonts, radius, spacing, type } from '../../../src/theme';
 import { initialsOf } from '../../../src/lib/format';
-import { ColorThemeSwitcher, ModeSwitcher } from '../../../src/web/webUi';
+import { BiometricToggle, ColorThemeSwitcher, ModeSwitcher } from '../../../src/web/webUi';
 
 /** The supervisor's own info — read-only, plus sign-out. */
 export default function SupervisorProfile() {
@@ -91,6 +91,8 @@ export default function SupervisorProfile() {
             Supervisor accounts are provisioned by R3U. Contact the office to change these details.
           </Text>
         </Section>
+
+        <BiometricToggle identifierLabel={supervisor.login_code} />
 
         <Section title="Appearance">
           <Card style={{ gap: 14 }}>

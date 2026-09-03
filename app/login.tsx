@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from '../src/lib/supabase';
 import { useSession } from '../src/lib/session';
 import {
   authenticateWithBiometrics,
-  biometricLoginSupported,
   BiometricRecord,
   clearBiometricSession,
   isBiometricAvailable,
   loadBiometricSession,
   saveBiometricSession,
+  supportedBiometricTypes,
 } from '../src/lib/biometricAuth';
-import { FingerprintIcon } from '../src/components/icons';
+import { FaceIdIcon, FingerprintIcon, PasscodeIcon } from '../src/components/icons';
 import { useWebTheme, WebThemeProvider } from '../src/web/webTheme';
 import { AuthShell, GlassButton, GlassErrorBanner, GlassField, GlassFootnote } from '../src/web/webUi';
 
@@ -38,6 +38,18 @@ import { AuthShell, GlassButton, GlassErrorBanner, GlassField, GlassFootnote } f
  * text below is whatever it sent back, verbatim — never reworded per role.
  * Once `setSession` lands, the root guard in `_layout.tsx` resolves the role
  * from the session and routes to the matching group on its own.
+ *
+ * Biometric quick sign-in is opt-in from Profile's "Sign-in & security"
+ * toggle (`BiometricToggle`, `src/web/webUi.tsx`) now, not offered here —
+ * "it should ask for the first time login only. not always. better dont
+ * ask, it should be a toggle." This screen only ever *reads* whatever was
+ * already turned on there: three tappable icons (Face ID / fingerprint /
+ * phone passcode) shown only once a record exists, each icon shown only if
+ * the device actually reports that capability. All three call the same
+ * `authenticateAsync()` under the hood — neither platform lets an app force
+ * "face only" or "fingerprint only" out of the one system prompt, so the
+ * icons are honest about *availability*, not independent code paths (see
+ * `supportedBiometricTypes()`'s doc comment).
  *
  * Visual layer, R3U-WAA-WEB-REDESIGN.md's follow-up: renders through
  * `AuthShell` (src/web/webUi.tsx) — the same glass chrome as
@@ -69,65 +81,26 @@ function LoginForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * "User can login by using finger print, facial recognition ang phone
-   * passcode, if there's phone don't have that, they can only enter user id
-   * together with there set password." The typed form below is ALWAYS
-   * present and always works — this block is purely additive, and only ever
-   * appears once a device has both the hardware/enrollment for it AND a
-   * saved quick-login record from a previous successful password sign-in
-   * (see the opt-in prompt at the bottom of `submit()`).
-   */
-  const [bioAvailable, setBioAvailable] = useState(false);
   const [bioRecord, setBioRecord] = useState<BiometricRecord | null>(null);
+  const [bioTypes, setBioTypes] = useState({ face: false, fingerprint: false });
   const [bioBusy, setBioBusy] = useState(false);
-
-  // Also guards the opt-in prompt fired from `submit()` below: a successful
-  // sign-in re-resolves the session almost immediately, and the root guard
-  // can navigate this screen away before that fire-and-forget check settles.
-  const mountedRef = React.useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 
   useEffect(() => {
     let active = true;
     (async () => {
-      const [available, record] = await Promise.all([isBiometricAvailable(), loadBiometricSession()]);
+      const [available, record, types] = await Promise.all([
+        isBiometricAvailable(),
+        loadBiometricSession(),
+        supportedBiometricTypes(),
+      ]);
       if (!active) return;
-      setBioAvailable(available);
-      setBioRecord(record);
+      setBioRecord(available ? record : null);
+      setBioTypes(types);
     })();
     return () => {
       active = false;
     };
   }, []);
-
-  /** Offered once, right after a fresh password sign-in — never nagged on
-   * every launch, and never for a device that can't do it at all. */
-  function offerBiometricOptIn(identifierLabel: string, refreshToken: string, replacing: boolean) {
-    Alert.alert(
-      'Enable quick sign-in?',
-      replacing
-        ? `Use your fingerprint, face, or phone passcode to sign in as ${identifierLabel} on this device next time. This replaces the account currently enabled for quick sign-in here.`
-        : `Use your fingerprint, face, or phone passcode to sign in as ${identifierLabel} on this device next time — no password to type.`,
-      [
-        { text: 'Not now', style: 'cancel' },
-        {
-          text: 'Enable',
-          onPress: async () => {
-            const ok = await authenticateWithBiometrics('Confirm to enable quick sign-in');
-            if (!ok) return;
-            await saveBiometricSession({ identifierLabel, refreshToken });
-            if (mountedRef.current) setBioRecord({ identifierLabel, refreshToken });
-          },
-        },
-      ]
-    );
-  }
 
   async function submit() {
     setError(null);
@@ -155,7 +128,7 @@ function LoginForm() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        // Already the generic "Incorrect phone/email or password." — show it as
+        // Already the generic "Incorrect User ID or password." — show it as
         // sent rather than adding a role-specific hint on top of it.
         setError(
           (data && typeof data.error === 'string' && data.error) ||
@@ -172,23 +145,8 @@ function LoginForm() {
         setError(sessionError.message);
         return;
       }
-
-      // Password sign-in worked — offer (or silently refresh) biometric
-      // quick-login. Fire-and-forget: none of this should hold up the
-      // redirect the root guard is about to do.
-      if (biometricLoginSupported()) {
-        isBiometricAvailable().then((available) => {
-          if (!available) return;
-          if (bioRecord && bioRecord.identifierLabel === trimmed) {
-            // Same account already enabled here — just keep the token
-            // current, no need to ask again.
-            saveBiometricSession({ identifierLabel: trimmed, refreshToken: data.refresh_token });
-          } else {
-            offerBiometricOptIn(trimmed, data.refresh_token, !!bioRecord);
-          }
-        });
-      }
-      // On success the root guard redirects into the right role group.
+      // On success the root guard redirects into the right role group. No
+      // biometric opt-in offer here any more — that lives in Profile now.
     } catch {
       setError('Could not reach the server. Check your connection and try again.');
     } finally {
@@ -212,7 +170,7 @@ function LoginForm() {
         // elsewhere) — stop offering a quick-login button that will only fail.
         await clearBiometricSession();
         setBioRecord(null);
-        setError('Your saved sign-in has expired. Enter your password to continue.');
+        setError('Your saved sign-in has expired. Enter your password to continue, then turn quick sign-in back on from Profile.');
         return;
       }
 
@@ -237,37 +195,20 @@ function LoginForm() {
           {roleError ? <GlassErrorBanner message={roleError} /> : null}
           {error ? <GlassErrorBanner message={error} /> : null}
 
-          {bioAvailable && bioRecord ? (
+          {bioRecord ? (
             <>
-              <Pressable
-                onPress={signInWithBiometrics}
-                disabled={bioBusy || busy}
-                style={({ pressed }) => [
-                  {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 10,
-                    paddingVertical: 14,
-                    borderRadius: 13,
-                    borderWidth: 1,
-                    borderColor: palette.border,
-                    backgroundColor: palette.panelSolid,
-                    marginBottom: 14,
-                  },
-                  (bioBusy || busy) && { opacity: 0.55 },
-                  pressed && !(bioBusy || busy) && { opacity: 0.88 },
-                ]}
-              >
-                {bioBusy ? (
-                  <ActivityIndicator color={palette.accent2} />
-                ) : (
-                  <FingerprintIcon color={palette.accent2} size={20} />
-                )}
-                <Text style={{ color: palette.text, fontSize: 14.5, fontWeight: '700' }}>
-                  Continue as {bioRecord.identifierLabel}
-                </Text>
-              </Pressable>
+              <Text style={{ fontSize: 12, color: palette.muted, textAlign: 'center', marginBottom: 10 }}>
+                Continue as <Text style={{ fontWeight: '700', color: palette.text }}>{bioRecord.identifierLabel}</Text>
+              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16, marginBottom: 14 }}>
+                {bioTypes.face ? (
+                  <BioIconButton icon={FaceIdIcon} busy={bioBusy} disabled={busy} onPress={signInWithBiometrics} palette={palette} />
+                ) : null}
+                {bioTypes.fingerprint ? (
+                  <BioIconButton icon={FingerprintIcon} busy={bioBusy} disabled={busy} onPress={signInWithBiometrics} palette={palette} />
+                ) : null}
+                <BioIconButton icon={PasscodeIcon} busy={bioBusy} disabled={busy} onPress={signInWithBiometrics} palette={palette} />
+              </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                 <View style={{ flex: 1, height: 1, backgroundColor: palette.border }} />
                 <Text style={{ fontSize: 11, color: palette.muted, fontWeight: '700' }}>OR SIGN IN WITH PASSWORD</Text>
@@ -306,5 +247,45 @@ function LoginForm() {
         </AuthShell>
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+/** One circular icon button in the quick-sign-in row. All three (Face ID /
+ * fingerprint / passcode) call the same handler — see the module doc
+ * comment above for why that's an honest choice, not a shortcut. */
+function BioIconButton({
+  icon: Icon,
+  onPress,
+  busy,
+  disabled,
+  palette,
+}: {
+  icon: typeof FaceIdIcon;
+  onPress: () => void;
+  busy: boolean;
+  disabled: boolean;
+  palette: { border: string; panelSolid: string; accent2: string };
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={busy || disabled}
+      style={({ pressed }) => [
+        {
+          width: 56,
+          height: 56,
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: palette.border,
+          backgroundColor: palette.panelSolid,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        (busy || disabled) && { opacity: 0.55 },
+        pressed && !(busy || disabled) && { opacity: 0.85 },
+      ]}
+    >
+      {busy ? <ActivityIndicator color={palette.accent2} /> : <Icon color={palette.accent2} size={24} />}
+    </Pressable>
   );
 }

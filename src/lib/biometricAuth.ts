@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
+import { supabase } from './supabase';
 
 /**
  * "Fingerprint, facial recognition, phone passcode — sign in fast; if the
@@ -58,6 +59,30 @@ export async function isBiometricAvailable(): Promise<boolean> {
   }
 }
 
+/**
+ * Which enrolled methods the OS reports (a device can genuinely have more
+ * than one — face and fingerprint both enrolled). Drives which icons the
+ * login screen shows: no point offering a Face ID button on a
+ * fingerprint-only phone. This does NOT let a tap force "face only" or
+ * "fingerprint only" — neither iOS's nor Android's system biometric prompt
+ * exposes that choice to an app; whichever icon is tapped still opens the
+ * one OS prompt, which itself decides what to show (and still falls back to
+ * the device passcode if biometrics fail or are cancelled). The three icons
+ * are honest about *availability*, not independent code paths.
+ */
+export async function supportedBiometricTypes(): Promise<{ face: boolean; fingerprint: boolean }> {
+  if (!biometricLoginSupported()) return { face: false, fingerprint: false };
+  try {
+    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+    return {
+      face: types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION),
+      fingerprint: types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT),
+    };
+  } catch {
+    return { face: false, fingerprint: false };
+  }
+}
+
 /** Runs the native prompt. Resolves `true` only on an actual success —
  * cancel, lockout, and "not available" all resolve `false` rather than
  * throwing, so callers never need a try/catch just to handle "the person hit
@@ -103,6 +128,26 @@ export async function loadBiometricSession(): Promise<BiometricRecord | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Turns quick sign-in on, from inside the app (Profile's "Sign-in &
+ * Security" toggle) rather than as a nag after every password login —
+ * "it should ask for the first time login only. not always. better dont
+ * ask, it should be a toggle off/on in the settings." The person is already
+ * signed in when they flip this on, so there's no fresh password submit to
+ * hook: this reads the *current* session's own refresh token directly and
+ * confirms with one biometric prompt before storing it, same confirmation
+ * step the old post-login prompt used to do.
+ */
+export async function enableBiometricLogin(identifierLabel: string): Promise<boolean> {
+  const ok = await authenticateWithBiometrics('Confirm to enable quick sign-in');
+  if (!ok) return false;
+  const { data } = await supabase.auth.getSession();
+  const refreshToken = data.session?.refresh_token;
+  if (!refreshToken) return false;
+  await saveBiometricSession({ identifierLabel, refreshToken });
+  return true;
 }
 
 /** Forgets this device. Called from the explicit "Sign out" button (not the

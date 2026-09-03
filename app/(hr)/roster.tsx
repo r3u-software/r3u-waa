@@ -138,7 +138,14 @@ export default function HrRoster() {
                     columns={cols}
                     onPress={() => router.push(`/(hr)/worker/${w.id}`)}
                     values={{
-                      worker: <WorkerCell name={w.full_name} sub={w.position || 'No position'} />,
+                      worker: (
+                        <WorkerCell
+                          name={w.full_name}
+                          sub={w.position || 'No position'}
+                          photoBucket="waa-selfies"
+                          photoPath={w.status === 'complete' ? w.face_scan_url : null}
+                        />
+                      ),
                       phone: w.phone || '—',
                       status: <WebPill label={w.employment_status} tone={webToneFor(toneForStatus(w.employment_status))} />,
                     }}

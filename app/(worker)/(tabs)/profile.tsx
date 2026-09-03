@@ -5,7 +5,8 @@ import { useSession, useWorker } from '../../../src/lib/session';
 import { ProfileEditor } from '../../../src/components/ProfileEditor';
 import { initialsOf } from '../../../src/lib/format';
 import { useWebTheme } from '../../../src/web/webTheme';
-import { ColorThemeSwitcher, GlassCard, GlassOutlineButton, GlassScreen, ModeSwitcher, WebSection } from '../../../src/web/webUi';
+import { BiometricToggle, ColorThemeSwitcher, GlassCard, GlassOutlineButton, GlassScreen, ModeSwitcher, WebSection } from '../../../src/web/webUi';
+import { SignedImage } from '../../../src/components/SignedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function WorkerProfile() {
@@ -25,14 +26,21 @@ export default function WorkerProfile() {
     <GlassScreen>
       <ScrollView contentContainerStyle={{ padding: 20, paddingTop: insets.top + 20, paddingBottom: 40 }}>
         <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center', marginBottom: 26 }}>
-          <LinearGradient
-            colors={[palette.accent, palette.accent2]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{ width: 58, height: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 19 }}>{initialsOf(worker.full_name)}</Text>
-          </LinearGradient>
+          {/* Once a supervisor has approved the face scan, it stands in for
+              the gradient-initials mark — a real photo confirms this is the
+              actual verified person, not just whoever typed the password. */}
+          {worker.status === 'complete' && worker.face_scan_url ? (
+            <SignedImage bucket="waa-selfies" path={worker.face_scan_url} size={58} radius={16} />
+          ) : (
+            <LinearGradient
+              colors={[palette.accent, palette.accent2]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ width: 58, height: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 19 }}>{initialsOf(worker.full_name || '?')}</Text>
+            </LinearGradient>
+          )}
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>{worker.full_name}</Text>
             <Text style={{ fontSize: 13, color: palette.muted, marginTop: 2 }}>{worker.phone || 'No phone on file'}</Text>
@@ -43,6 +51,8 @@ export default function WorkerProfile() {
         </View>
 
         <ProfileEditor worker={worker} />
+
+        <BiometricToggle identifierLabel={worker.login_code} />
 
         <WebSection title="Appearance">
           <GlassCard style={{ gap: 16 }}>

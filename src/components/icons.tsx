@@ -346,6 +346,41 @@ export function FingerprintIcon(p: IconProps) {
   );
 }
 
+/** Face ID glyph — corner brackets around a simple face, matching the
+ * scan-frame convention every platform uses for facial recognition. */
+export function FaceIdIcon(p: IconProps) {
+  return (
+    <Svg {...base(p)}>
+      <Path d="M3 8V5.5A2.5 2.5 0 0 1 5.5 3H8" />
+      <Path d="M16 3h2.5A2.5 2.5 0 0 1 21 5.5V8" />
+      <Path d="M21 16v2.5a2.5 2.5 0 0 1-2.5 2.5H16" />
+      <Path d="M8 21H5.5A2.5 2.5 0 0 1 3 18.5V16" />
+      <Circle cx="9" cy="10.5" r="0.9" fill={p.color ?? colors.ink} stroke="none" />
+      <Circle cx="15" cy="10.5" r="0.9" fill={p.color ?? colors.ink} stroke="none" />
+      <Path d="M9 15c1 .8 2 1.1 3 1.1s2-.3 3-1.1" />
+    </Svg>
+  );
+}
+
+/** Phone-passcode glyph — a keypad grid, for "sign in with your device
+ * passcode" as a distinct option from face/fingerprint. */
+export function PasscodeIcon(p: IconProps) {
+  return (
+    <Svg {...base(p)}>
+      <Circle cx="7" cy="6.5" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
+      <Circle cx="12" cy="6.5" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
+      <Circle cx="17" cy="6.5" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
+      <Circle cx="7" cy="12" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
+      <Circle cx="12" cy="12" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
+      <Circle cx="17" cy="12" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
+      <Circle cx="7" cy="17.5" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
+      <Circle cx="12" cy="17.5" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
+      <Path d="M15.5 15.5h4a1 1 0 0 1 1 1v3.5a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V16.5a1 1 0 0 1 1-1Z" />
+      <Path d="M16.5 15.5v-1.3a1.5 1.5 0 0 1 3 0v1.3" />
+    </Svg>
+  );
+}
+
 /** "System" mode glyph — a monitor, for the light/dark/system 3-way switcher. */
 export function MonitorIcon(p: IconProps) {
   return (

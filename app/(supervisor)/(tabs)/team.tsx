@@ -132,7 +132,11 @@ export default function TeamScreen() {
                   ]}
                 >
                   <View style={[s.cell, s.cellWorker]}>
-                    <WorkerCell name={r.worker.full_name} />
+                    <WorkerCell
+                      name={r.worker.full_name}
+                      photoBucket="waa-selfies"
+                      photoPath={r.worker.status === 'complete' ? r.worker.face_scan_url : null}
+                    />
                   </View>
                   <Text style={[s.cell, s.cellWide, gs.body]} numberOfLines={1}>
                     {r.worker.position || '—'}

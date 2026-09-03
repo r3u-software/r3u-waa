@@ -176,7 +176,12 @@ export default function SupervisorHome() {
                   ]}
                 >
                   <View style={{ flex: 1 }}>
-                    <WorkerCell name={w.full_name} sub={w.phone || 'No phone on file'} />
+                    <WorkerCell
+                      name={w.full_name}
+                      sub={w.phone || 'No phone on file'}
+                      photoBucket="waa-selfies"
+                      photoPath={w.status === 'complete' ? w.face_scan_url : null}
+                    />
                   </View>
                   <WebPill label={label} tone={tone} />
                 </Pressable>

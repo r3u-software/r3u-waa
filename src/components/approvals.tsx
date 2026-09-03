@@ -6,7 +6,7 @@ import { useWebTheme } from '../web/webTheme';
 import { GlassButton, GlassCard, GlassField, GlassOutlineButton, WebPill, webToneFor } from '../web/webUi';
 import { toneForStatus } from '../theme';
 import { coords, dateRange, relativeStamp } from '../lib/format';
-import type { WaaCashAdvanceDetailed, WaaLeaveRequestDetailed, WaaTimeEntryDetailed } from '../lib/types';
+import type { WaaCashAdvanceDetailed, WaaLeaveRequestDetailed, WaaTimeEntryDetailed, WaaWorker } from '../lib/types';
 
 /**
  * Supervisor's approval cards — Supervisor's own Home and Approvals tabs are
@@ -180,6 +180,106 @@ export function RequestApprovalCard({
               onPress={() => {
                 setDeclining(false);
                 onDecide('declined', remarks.trim() || undefined);
+                setRemarks('');
+              }}
+            />
+            <GlassOutlineButton label="Cancel" onPress={() => setDeclining(false)} style={{ marginTop: 10 }} />
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
+/**
+ * A worker's pending identity submission (name + face scan + valid ID, all
+ * three present at once — see `updateWorkerProfile` in `queries.ts`)
+ * awaiting the supervisor's approve/reject decision.
+ *
+ * Reject is deliberately not a one-tap action: it deletes the uploaded face
+ * scan and valid ID permanently and clears the worker's name, so it opens
+ * the same kind of remarks sheet `RequestApprovalCard` uses for leave
+ * declines — remarks here are shown back to the worker as *why*, since the
+ * evidence itself won't be there for them to look at afterward.
+ */
+export function ProfileApprovalCard({
+  worker,
+  busy,
+  onDecide,
+}: {
+  worker: WaaWorker;
+  busy: boolean;
+  onDecide: (decision: 'approve' | 'reject', remarks?: string) => void;
+}) {
+  const { palette } = useWebTheme();
+  const [declining, setDeclining] = useState(false);
+  const [remarks, setRemarks] = useState('');
+
+  return (
+    <>
+      <GlassCard style={{ marginBottom: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+          <SignedImage bucket="waa-selfies" path={worker.face_scan_url} size={56} radius={12} />
+          <SignedImage bucket="waa-ids" path={worker.valid_id_url} size={56} radius={12} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>{worker.full_name}</Text>
+            <Text style={{ fontSize: 12, color: palette.muted }}>{worker.phone || 'No phone on file'}</Text>
+          </View>
+          <WebPill label="Review" tone="info" />
+        </View>
+        <Text style={{ fontSize: 11, color: palette.muted, marginTop: 10 }}>
+          Confirm the photo, ID, and name genuinely match before approving.
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+          <GlassOutlineButton label="Reject" onPress={() => setDeclining(true)} disabled={busy} style={{ flex: 1 }} />
+          <GlassButton
+            label={busy ? 'Working…' : 'Approve'}
+            tone="good"
+            onPress={() => onDecide('approve')}
+            loading={busy}
+            style={{ flex: 1 }}
+          />
+        </View>
+      </GlassCard>
+
+      <Modal visible={declining} transparent animationType="slide" onRequestClose={() => setDeclining(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
+          onPress={() => setDeclining(false)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: palette.panelSolid,
+              borderWidth: 1,
+              borderColor: palette.border,
+              borderBottomWidth: 0,
+              borderTopLeftRadius: 22,
+              borderTopRightRadius: 22,
+              padding: 22,
+              paddingBottom: 40,
+            }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text, marginBottom: 4 }}>
+              Reject this submission?
+            </Text>
+            <Text style={{ fontSize: 12.5, color: palette.muted, lineHeight: 18, marginBottom: 16 }}>
+              The uploaded face scan and ID are deleted permanently, and {worker.full_name}'s name is
+              cleared — they start over from scratch. Your remarks are shown to them as why.
+            </Text>
+            <GlassField
+              label="Remarks (optional)"
+              value={remarks}
+              onChangeText={setRemarks}
+              placeholder="Why are you rejecting this?"
+              multiline
+            />
+            <GlassButton
+              label="Reject and delete"
+              tone="warn"
+              onPress={() => {
+                setDeclining(false);
+                onDecide('reject', remarks.trim() || undefined);
                 setRemarks('');
               }}
             />

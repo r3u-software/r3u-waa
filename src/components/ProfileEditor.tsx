@@ -31,7 +31,12 @@ export function ProfileEditor({ worker, onboarding }: { worker: WaaWorker; onboa
 
   const hasFace = Boolean(worker.face_scan_url);
   const hasId = Boolean(worker.valid_id_url);
-  const complete = hasFace && hasId;
+  const complete = worker.status === 'complete';
+  /** Awaiting supervisor review — name/face/ID are locked, both here (UI)
+   * and server-side (the `waa_protect_sensitive_columns` trigger backs this
+   * up regardless of what this screen does). */
+  const pending = worker.status === 'pending';
+  const locked = pending || uploading !== null || savingDetails;
 
   async function saveDetails() {
     if (!fullName.trim()) {
@@ -103,11 +108,31 @@ export function ProfileEditor({ worker, onboarding }: { worker: WaaWorker; onboa
         <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text }}>Registration status</Text>
         <WebPill label={worker.status} tone={webToneFor(toneForStatus(worker.status))} />
       </View>
-      <Text style={{ fontSize: 12, color: palette.muted, lineHeight: 17, marginBottom: 20 }}>
+      <Text style={{ fontSize: 12, color: palette.muted, lineHeight: 17, marginBottom: pending ? 12 : 20 }}>
         {complete
           ? 'Your profile is complete. Your supervisor can now verify your punches.'
-          : 'Add both a face scan and a valid ID to complete your registration.'}
+          : pending
+            ? 'Submitted — your supervisor needs to review your name, face scan, and ID before your profile is complete.'
+            : 'Add your name, a face scan, and a valid ID to complete your registration.'}
       </Text>
+
+      {pending ? (
+        <View style={{ backgroundColor: palette.infoBg, borderRadius: 14, padding: 14, marginBottom: 20 }}>
+          <Text style={{ fontSize: 12.5, color: palette.info, fontWeight: '700', marginBottom: 3 }}>Awaiting supervisor review</Text>
+          <Text style={{ fontSize: 11.5, color: palette.info, lineHeight: 16 }}>
+            Your name, face scan, and ID are locked until your supervisor approves or rejects this
+            submission — nothing to do here until then.
+          </Text>
+        </View>
+      ) : worker.profile_rejected_reason ? (
+        <View style={{ backgroundColor: palette.badBg, borderRadius: 14, padding: 14, marginBottom: 20 }}>
+          <Text style={{ fontSize: 12.5, color: palette.bad, fontWeight: '700', marginBottom: 3 }}>Your last submission was declined</Text>
+          <Text style={{ fontSize: 11.5, color: palette.bad, lineHeight: 16 }}>
+            {worker.profile_rejected_reason} Your previous face scan and ID were removed — add fresh
+            ones below along with your name to resubmit.
+          </Text>
+        </View>
+      ) : null}
 
       {/* -------------------------------- Face scan --------------------- */}
       <SectionTitle>Face scan</SectionTitle>
@@ -123,16 +148,19 @@ export function ProfileEditor({ worker, onboarding }: { worker: WaaWorker; onboa
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>{hasFace ? 'Face scan on file' : 'No face scan yet'}</Text>
             <Text style={{ fontSize: 12, color: palette.muted, lineHeight: 17 }}>
-              A clear selfie taken with the front camera. You can retake it any time.
+              {pending ? 'Locked while your submission is under review.' : 'A clear selfie taken with the front camera. You can retake it any time.'}
             </Text>
           </View>
         </View>
-        <GlassButton
-          label={uploading === 'face' ? 'Uploading…' : hasFace ? 'Retake face scan' : 'Take face scan'}
-          onPress={doFaceScan}
-          loading={uploading === 'face'}
-          style={{ marginTop: 12 }}
-        />
+        {!pending ? (
+          <GlassButton
+            label={uploading === 'face' ? 'Uploading…' : hasFace ? 'Retake face scan' : 'Take face scan'}
+            onPress={doFaceScan}
+            loading={uploading === 'face'}
+            disabled={locked}
+            style={{ marginTop: 12 }}
+          />
+        ) : null}
       </GlassCard>
 
       {/* -------------------------------- Valid ID ---------------------- */}
@@ -149,22 +177,32 @@ export function ProfileEditor({ worker, onboarding }: { worker: WaaWorker; onboa
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={{ fontSize: 13.5, fontWeight: '700', color: palette.text }}>{hasId ? 'Valid ID on file' : 'No valid ID yet'}</Text>
             <Text style={{ fontSize: 12, color: palette.muted, lineHeight: 17 }}>
-              Any government-issued ID. Make sure the name and photo are readable.
+              {pending ? 'Locked while your submission is under review.' : 'Any government-issued ID. Make sure the name and photo are readable.'}
             </Text>
           </View>
         </View>
-        <GlassButton
-          label={uploading === 'id' ? 'Uploading…' : hasId ? 'Replace valid ID' : 'Upload valid ID'}
-          onPress={chooseIdSource}
-          loading={uploading === 'id'}
-          style={{ marginTop: 12 }}
-        />
+        {!pending ? (
+          <GlassButton
+            label={uploading === 'id' ? 'Uploading…' : hasId ? 'Replace valid ID' : 'Upload valid ID'}
+            onPress={chooseIdSource}
+            loading={uploading === 'id'}
+            disabled={locked}
+            style={{ marginTop: 12 }}
+          />
+        ) : null}
       </GlassCard>
 
       {/* -------------------------------- Details ----------------------- */}
       <SectionTitle>Your details</SectionTitle>
       <GlassCard style={{ marginBottom: 20 }}>
-        <GlassField label="Full name" value={fullName} onChangeText={setFullName} placeholder="Your full name" hint="Correct this if your supervisor typed it wrong." />
+        <GlassField
+          label="Full name"
+          value={fullName}
+          onChangeText={setFullName}
+          placeholder="Your full name"
+          editable={!pending}
+          hint={pending ? 'Locked while your submission is under review.' : 'Correct this if your supervisor typed it wrong.'}
+        />
         <GlassField
           label="Phone"
           value={phone}
@@ -194,7 +232,7 @@ export function ProfileEditor({ worker, onboarding }: { worker: WaaWorker; onboa
         </View>
       </GlassCard>
 
-      {onboarding && complete ? (
+      {onboarding && (complete || pending) ? (
         <GlassButton label="Go to my dashboard" onPress={() => router.replace('/(worker)/(tabs)')} style={{ marginBottom: 30 }} />
       ) : null}
     </>
