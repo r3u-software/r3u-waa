@@ -16,7 +16,14 @@ import {
   MetricCard,
   WebPageHeader,
 } from '../../src/web/webUi';
-import { ChevronRightIcon } from '../../src/components/icons';
+import {
+  CalendarIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  CurrencyIcon,
+  TeamIcon,
+  WalletIcon,
+} from '../../src/components/icons';
 import { hours, periodLabel, peso, toDateColumn } from '../../src/lib/format';
 
 /**
@@ -294,25 +301,67 @@ export default function HrAnalytics() {
         )
       ) : (
         <>
+          {/* nexus's `.grid.g6` KPI strip: each card leads with a tinted icon
+              square, then the uppercase micro-label, then the figure. The
+              icon tints are semantic (money/people/attendance/leave/OT/cash),
+              matching how the reference colour-codes its own KPI row. */}
           <View style={s.grid}>
-            <MetricCard style={s.metricItem} label="Payroll cost · net paid" value={peso(m.payroll_cost.net.value)} trendPct={m.payroll_cost.net.trend_pct} />
             <MetricCard
               style={s.metricItem}
+              icon={<CurrencyIcon color={palette.accent2} size={17} />}
+              iconBg={palette.accentBg}
+              label="Payroll cost · net paid"
+              value={peso(m.payroll_cost.net.value)}
+              trendPct={m.payroll_cost.net.trend_pct}
+              trendNote="vs last period"
+            />
+            <MetricCard
+              style={s.metricItem}
+              icon={<TeamIcon color={palette.good} size={17} />}
+              iconBg={palette.goodBg}
               label="Headcount · active"
               value={m.headcount.active_at_end.value.toLocaleString()}
               trendPct={m.headcount.active_at_end.trend_pct}
               direction="up-good"
+              trendNote="vs last period"
             />
             <MetricCard
               style={s.metricItem}
+              icon={<ClockIcon color={palette.warn} size={17} />}
+              iconBg={palette.warnBg}
               label="Absence rate"
               value={`${m.attendance.absence_rate.value.toFixed(1)}%`}
               trendPct={m.attendance.absence_rate.trend_pct}
               direction="down-good"
+              trendNote="vs last period"
             />
-            <MetricCard style={s.metricItem} label="Leave taken" value={`${m.leave.total_days.value.toLocaleString()} days`} trendPct={m.leave.total_days.trend_pct} />
-            <MetricCard style={s.metricItem} label="Overtime cost" value={peso(m.overtime.cost.value)} trendPct={m.overtime.cost.trend_pct} />
-            <MetricCard style={s.metricItem} label="Cash advances · requested" value={peso(m.cash_advances.requested.value)} trendPct={m.cash_advances.requested.trend_pct} />
+            <MetricCard
+              style={s.metricItem}
+              icon={<CalendarIcon color={palette.info} size={17} />}
+              iconBg={palette.infoBg}
+              label="Leave taken"
+              value={`${m.leave.total_days.value.toLocaleString()} days`}
+              trendPct={m.leave.total_days.trend_pct}
+              trendNote="vs last period"
+            />
+            <MetricCard
+              style={s.metricItem}
+              icon={<ClockIcon color={palette.accent} size={17} />}
+              iconBg={palette.accentBg}
+              label="Overtime cost"
+              value={peso(m.overtime.cost.value)}
+              trendPct={m.overtime.cost.trend_pct}
+              trendNote="vs last period"
+            />
+            <MetricCard
+              style={s.metricItem}
+              icon={<WalletIcon color={palette.bad} size={17} />}
+              iconBg={palette.badBg}
+              label="Cash advances · requested"
+              value={peso(m.cash_advances.requested.value)}
+              trendPct={m.cash_advances.requested.trend_pct}
+              trendNote="vs last period"
+            />
           </View>
 
           <View style={s.grid2}>
@@ -538,8 +587,12 @@ const s = StyleSheet.create({
   navBtn: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   mirrored: { transform: [{ scaleX: -1 }] },
   fieldLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 14, marginBottom: 8 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 13, marginBottom: 14 },
-  metricItem: { flexGrow: 1, flexBasis: 250, minWidth: 210 },
+  // nexus's `.grid.g6` — six across at desktop width, wrapping down to
+  // three/two as the pane narrows. `flexBasis: 150` is what actually gets
+  // six on a row at ~1180px of content; the old 250 basis only ever fit
+  // four, which is why the KPI strip read as two ragged rows.
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginBottom: 15 },
+  metricItem: { flexGrow: 1, flexBasis: 150, minWidth: 148 },
   grid2: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginBottom: 14 },
   panelItem: { flexGrow: 1, flexBasis: 380, minWidth: 300 },
   dayRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

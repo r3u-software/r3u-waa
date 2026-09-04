@@ -67,12 +67,28 @@ export interface WebPalette {
   goodBg: string;
   bad: string;
   badBg: string;
+  /** nexus's `--warn` / `.t-warn` — amber, distinct from `bad`'s red. The
+   * original four-tone set had no amber at all, so "pending"/"needs a look"
+   * had to borrow either the red or the blue. */
+  warn: string;
+  warnBg: string;
   info: string;
   infoBg: string;
+  /** Tint of the live accent, for `.t-brand`-style pills and icon chips. */
+  accentBg: string;
 }
 
 function themeById(id: string): WebThemeDef {
   return WEB_THEMES.find((t) => t.id === id) ?? WEB_THEMES[0];
+}
+
+/** `#RRGGBB` -> `rgba(r,g,b,a)`. Every accent above is 6-digit hex. */
+function hexAlpha(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 export function resolvePalette(themeId: string, mode: WebMode): WebPalette {
@@ -95,8 +111,12 @@ export function resolvePalette(themeId: string, mode: WebMode): WebPalette {
     goodBg: dark ? 'rgba(63,194,126,0.16)' : 'rgba(31,138,84,0.12)',
     bad: dark ? '#FF6B6B' : '#C23B3B',
     badBg: dark ? 'rgba(255,107,107,0.16)' : 'rgba(194,59,59,0.1)',
+    // nexus's `--warn:#fbbf24` (dark) / `#d97706` (light).
+    warn: dark ? '#FBBF24' : '#B87503',
+    warnBg: dark ? 'rgba(251,191,36,0.15)' : 'rgba(184,117,3,0.12)',
     info: dark ? '#4FA2FF' : '#1D6FE0',
     infoBg: dark ? 'rgba(79,162,255,0.16)' : 'rgba(29,111,224,0.1)',
+    accentBg: hexAlpha(accent2, dark ? 0.16 : 0.12),
   };
 }
 

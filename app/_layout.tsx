@@ -6,10 +6,18 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Inter_400Regular,
+  Inter_500Medium,
   Inter_600SemiBold,
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
+import {
+  Outfit_500Medium,
+  Outfit_600SemiBold,
+  Outfit_700Bold,
+  Outfit_800ExtraBold,
+} from '@expo-google-fonts/outfit';
+import { JetBrainsMono_500Medium, JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono';
 import { SessionProvider, useSession } from '../src/lib/session';
 import { useIdleLogout } from '../src/lib/useIdleLogout';
 import { resolvePalette } from '../src/web/webTheme';
@@ -119,7 +127,23 @@ function RootNavigator() {
    * on web; native lands on /blocked-use-web instead of either role group.
    * Worker and Supervisor are completely untouched by this.
    */
-  const hrOnTrack = role === 'hr_admin' && (Platform.OS === 'web' ? inHr : onBlockedUseWeb);
+  /**
+   * `(hr)/(tabs)/*` — the retired "3 emergency mobile actions" screens — are
+   * still in the repo (kept, not deleted, when HR/Admin went web-only) and
+   * still render in the original orange paper theme. They were assumed
+   * unreachable, but `inHr` alone is satisfied by ANY route inside the
+   * group, tab screens included: land on one (expo-router restoring the
+   * group's default child after a reload will do it) and the guard is
+   * perfectly happy to leave you there, looking at the pre-redesign UI.
+   * Found live, in the middle of a redesign pass, on the deployed shell.
+   * Treated as off-track now, so the redirect below sends them to Analytics
+   * like any other stray route.
+   */
+  // `useSegments()` types itself from the known route tree, so index 1 isn't
+  // in its tuple type here — the value is there at runtime regardless.
+  const inHrTabs = inHr && (segments as string[])[1] === '(tabs)';
+  const hrOnTrack =
+    role === 'hr_admin' && (Platform.OS === 'web' ? inHr && !inHrTabs : onBlockedUseWeb);
   const platformOwnerOnTrack =
     role === 'platform_owner' && (Platform.OS === 'web' ? inPlatformOwner : onBlockedUseWeb);
 
@@ -235,10 +259,22 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  // Three families, matching nexus-hris.html's own type system exactly:
+  // Outfit for display (headings, KPI figures, the brand mark), Inter for
+  // body/UI text, JetBrains Mono for tabular figures — money, hours, counts.
+  // Loading all three up front (rather than lazily per-surface) keeps the
+  // first paint after the splash from reflowing as each family arrives.
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
+    Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    Outfit_500Medium,
+    Outfit_600SemiBold,
+    Outfit_700Bold,
+    Outfit_800ExtraBold,
+    JetBrainsMono_500Medium,
+    JetBrainsMono_700Bold,
   });
 
   if (!fontsLoaded) {

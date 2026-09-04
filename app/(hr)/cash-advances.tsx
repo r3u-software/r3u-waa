@@ -138,21 +138,26 @@ export default function HrCashAdvances() {
                 </View>
                 <WebPill label="Requested" tone="info" />
               </View>
+              {/* nexus's inline `.btn-d` / `.btn-ok` pair — a row-level
+                  decision, not two full-width slabs stacked under the card. */}
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
                 <GlassOutlineButton
-                  label="Decline"
+                  label="✕ Decline"
+                  tone="bad"
+                  size="sm"
+                  block={false}
                   onPress={() => {
                     setRemarks('');
                     setDeclining(a);
                   }}
-                  style={{ flex: 1 }}
                 />
                 <GlassButton
-                  label={busyId === a.id ? 'Working…' : 'Approve'}
+                  label={busyId === a.id ? 'Working…' : '✓ Approve'}
                   tone="good"
+                  size="sm"
+                  block={false}
                   onPress={() => run(a.id, () => hrDecideCashAdvance(a.id, 'approved', hrAdmin.id))}
                   loading={busyId === a.id}
-                  style={{ flex: 1 }}
                 />
               </View>
             </GlassCard>
@@ -184,9 +189,11 @@ export default function HrCashAdvances() {
                 Attaching proof of the transfer marks this paid out. The database refuses the status change without one.
               </Text>
               <GlassButton
-                label={busyId === a.id ? 'Working…' : 'Attach proof & mark paid out'}
+                label={busyId === a.id ? 'Working…' : '⬆ Attach proof & mark paid out'}
                 onPress={() => askProof(a)}
                 loading={busyId === a.id}
+                size="sm"
+                block={false}
                 tone="good"
                 style={{ marginTop: 12 }}
               />

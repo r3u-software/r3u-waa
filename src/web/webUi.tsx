@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TextStyle, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Line, LinearGradient, Polygon, Polyline, Stop } from 'react-native-svg';
 import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
@@ -9,16 +9,24 @@ import { MonitorIcon, MoonIcon, SunIcon } from '../components/icons';
 import { initialsOf } from '../lib/format';
 import { SignedImage } from '../components/SignedImage';
 import type { WaaBucket } from '../lib/types';
+import { BODY, DISPLAY, MONO, SP, T } from './nexusType';
 
 /**
  * Presentational primitives for the HR/Admin + Platform Owner web dashboard —
  * the glass-card/enterprise-shell language from R3U-WAA-WEB-REDESIGN.md.
  * Everything here reads its colors from `useWebTheme()`, never a literal, so
  * every component repaints when the theme or light/dark mode changes.
+ *
+ * Type, density and control sizing come from `nexusType.ts` — the real
+ * values out of `nexus-hris.html`, not approximations. The first pass at
+ * that migration only restyled chrome (nav accent bar, popovers, sticky
+ * headers) and left these primitives on the old mobile-ish scale: system
+ * fonts, 14px-tall full-width buttons, airy card padding. Fair feedback that
+ * it didn't read as the reference at all; this is the actual port.
  */
 
-const FONT_DISPLAY = 'System';
-const FONT_MONO = 'Menlo, Consolas, monospace';
+const FONT_DISPLAY = DISPLAY.bold;
+const FONT_MONO = MONO.medium;
 
 /* ---------------------------------------------------------------- Glass --- */
 
@@ -26,20 +34,29 @@ export function GlassCard({
   children,
   style,
   onPress,
+  padding,
 }: {
   children: React.ReactNode;
   style?: ViewStyle;
   onPress?: () => void;
+  /** nexus's `.card-b` is `15px 17px` — asymmetric, tighter than the 16px
+   * square this used before. Callers that need the flush/no-padding variant
+   * (a table inside a card) pass zeroes. */
+  padding?: { y: number; x: number };
 }) {
   const { palette, mode } = useWebTheme();
   const outer: ViewStyle = {
-    borderRadius: 15,
+    borderRadius: SP.radius,
     borderWidth: 1,
     borderColor: palette.border,
     overflow: 'hidden',
-    ...webOnlyStyle({ boxShadow: '0 10px 30px rgba(0,0,0,0.16)' }),
+    ...webOnlyStyle({ boxShadow: '0 10px 40px -12px rgba(0,0,0,0.45)' }),
   };
-  const inner: ViewStyle = { backgroundColor: palette.panel, padding: 16 };
+  const inner: ViewStyle = {
+    backgroundColor: palette.panel,
+    paddingVertical: padding ? padding.y : SP.cardPadY,
+    paddingHorizontal: padding ? padding.x : SP.cardPadX,
+  };
   const content = (
     <BlurView intensity={mode === 'dark' ? 34 : 50} tint={mode} style={inner}>
       {children}
@@ -69,12 +86,8 @@ export function GlassPanel({
   const { palette } = useWebTheme();
   return (
     <GlassCard style={StyleSheet.flatten([{ padding: 18 }, style]) as ViewStyle}>
-      <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text, marginBottom: hint ? 2 : 12 }}>
-        {title}
-      </Text>
-      {hint ? (
-        <Text style={{ fontSize: 11.5, color: palette.muted, marginBottom: 12 }}>{hint}</Text>
-      ) : null}
+      <Text style={[T.cardTitle, { color: palette.text, marginBottom: hint ? 2 : 12 }]}>{title}</Text>
+      {hint ? <Text style={[T.cardHint, { color: palette.muted, marginBottom: 12 }]}>{hint}</Text> : null}
       {children}
     </GlassCard>
   );
@@ -88,7 +101,10 @@ export function MetricCard({
   trendPct,
   direction = 'neutral',
   trendLabel,
+  trendNote,
   spark,
+  icon,
+  iconBg,
   style,
 }: {
   label: string;
@@ -98,8 +114,13 @@ export function MetricCard({
   direction?: 'up-good' | 'down-good' | 'neutral';
   /** Overrides the auto "+4.2%" text — e.g. "6 hires", "18 requests". */
   trendLabel?: string;
+  /** Muted text after the trend figure — nexus's "vs last quarter". */
+  trendNote?: string;
   /** 6-12 relative values for a tiny inline trend line. */
   spark?: number[];
+  /** nexus's `.kpi .ic` — a small glyph in a tinted rounded square. */
+  icon?: React.ReactNode;
+  iconBg?: string;
   style?: ViewStyle;
 }) {
   const { palette } = useWebTheme();
@@ -116,36 +137,36 @@ export function MetricCard({
     trendLabel ?? (hasTrend ? `${positive ? '↑' : '↓'} ${Math.abs(trendPct!).toFixed(1)}%` : '—');
 
   return (
-    <GlassCard style={style}>
-      <Text style={{ fontSize: 11.5, fontWeight: '600', color: palette.muted }}>{label}</Text>
-      <Text
-        style={{
-          fontFamily: FONT_MONO,
-          fontVariant: ['tabular-nums'],
-          fontSize: 19,
-          fontWeight: '700',
-          color: palette.text,
-          marginTop: 8,
-          letterSpacing: -0.2,
-        }}
-      >
-        {value}
-      </Text>
-      <View
-        style={{
-          alignSelf: 'flex-start',
-          marginTop: 7,
-          paddingHorizontal: 7,
-          paddingVertical: 2,
-          borderRadius: 999,
-          backgroundColor: toneBg,
-        }}
-      >
-        <Text style={{ fontSize: 11, fontWeight: '700', color: toneColor }}>{text}</Text>
+    <GlassCard style={style} padding={{ y: SP.cardPadY, x: SP.cardPadX }}>
+      {/* nexus's `.kpi`: a tinted icon square, then the uppercase micro-label,
+          then the figure in Outfit 800 at 23px — not a mono number under a
+          sentence-case label, which is what this used to be. */}
+      {icon ? (
+        <View
+          style={{
+            width: 35,
+            height: 35,
+            borderRadius: 11,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: iconBg ?? palette.hover,
+            marginBottom: 10,
+          }}
+        >
+          {icon}
+        </View>
+      ) : null}
+      <Text style={[T.microLabel, { color: palette.muted }]}>{label}</Text>
+      <Text style={[T.kpiValue, { color: palette.text, marginTop: 3 }]}>{value}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 }}>
+        <Text style={[T.kpiTrend, { color: tone === 'muted' ? palette.muted : toneColor, fontFamily: tone === 'muted' ? BODY.medium : BODY.bold }]}>
+          {text}
+        </Text>
+        {trendNote ? <Text style={[T.kpiTrend, { color: palette.muted }]}>{trendNote}</Text> : null}
       </View>
       {spark && spark.length > 1 ? (
-        <View style={{ marginTop: 9, height: 24 }}>
-          <Sparkline values={spark} color={tone === 'bad' ? palette.bad : palette.good} />
+        <View style={{ marginTop: 9, height: 24, opacity: 0.45 }}>
+          <Sparkline values={spark} color={tone === 'bad' ? palette.bad : palette.accent2} />
         </View>
       ) : null}
     </GlassCard>
@@ -221,12 +242,42 @@ export function AreaChart({
  * `colors.safety`) everywhere on the glass shell — that orange is the native
  * paper app's brand color, correct there, and a jarring leftover here. */
 
+/**
+ * Button sizing, straight from nexus-hris.html's `.btn` scale:
+ * default `9.5px 16px` / 12.5px text, `.btn-sm` `5.5px 11px` / 11.5px,
+ * `.btn-xs` `4px 9px` / 10.5px. All three are inline-sized — the reference
+ * has no full-width button anywhere on a dashboard screen.
+ *
+ * `block` keeps the old full-width behaviour available, and stays the
+ * default on purpose: these same primitives are shared with the native
+ * Worker/Supervisor screens, where a full-width 44pt-tall tap target is the
+ * correct call and a 24px-tall inline pill is not. Web dashboard screens
+ * pass `size="sm"` (and no `block`) to get the reference's real density.
+ */
+export type GlassBtnSize = 'md' | 'sm' | 'xs';
+
+const BTN_METRICS: Record<GlassBtnSize, { py: number; px: number; radius: number; text: TextStyle }> = {
+  md: { py: 9.5, px: 16, radius: SP.radiusSm, text: T.btn },
+  sm: { py: 5.5, px: 11, radius: 9, text: T.btnSm },
+  xs: { py: 4, px: 9, radius: 8, text: T.btnXs },
+};
+
+/** The chunky full-width form button the native screens still want. */
+const BLOCK_METRICS: { py: number; px: number; radius: number; text: TextStyle } = {
+  py: 13,
+  px: 16,
+  radius: SP.radiusSm,
+  text: { fontFamily: BODY.bold, fontSize: 14 },
+};
+
 export function GlassButton({
   label,
   onPress,
   disabled,
   loading,
   tone = 'accent',
+  size = 'md',
+  block = true,
   style,
 }: {
   label: string;
@@ -238,10 +289,14 @@ export function GlassButton({
    * (mark paid) or a destructive one (decline) shouldn't wear the same
    * gradient as "Save settings" does. */
   tone?: 'accent' | 'good' | 'warn';
+  size?: GlassBtnSize;
+  /** Full-width (default, for native forms) vs. inline (dashboard toolbars). */
+  block?: boolean;
   style?: ViewStyle;
 }) {
   const { palette } = useWebTheme();
   const isOff = disabled || loading;
+  const m = block ? BLOCK_METRICS : BTN_METRICS[size];
   const grad: [string, string] =
     tone === 'good' ? [palette.good, palette.good] : tone === 'warn' ? [palette.bad, palette.bad] : [palette.accent, palette.accent2];
   return (
@@ -249,14 +304,20 @@ export function GlassButton({
       onPress={onPress}
       disabled={isOff}
       style={({ pressed }) => [
-        { borderRadius: 13, overflow: 'hidden' } as ViewStyle,
+        { borderRadius: m.radius, overflow: 'hidden' } as ViewStyle,
+        !block && ({ alignSelf: 'flex-start' } as ViewStyle),
         isOff && { opacity: 0.55 },
         pressed && !isOff && { opacity: 0.88 },
         style,
       ]}
     >
-      <ExpoLinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s2.btnFill}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={s2.btnText}>{label}</Text>}
+      <ExpoLinearGradient
+        colors={grad}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={{ paddingVertical: m.py, paddingHorizontal: m.px, alignItems: 'center', justifyContent: 'center' }}
+      >
+        {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={[m.text, { color: '#fff' }]}>{label}</Text>}
       </ExpoLinearGradient>
     </Pressable>
   );
@@ -266,27 +327,47 @@ export function GlassOutlineButton({
   label,
   onPress,
   disabled,
+  size = 'md',
+  block = true,
+  tone,
   style,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  size?: GlassBtnSize;
+  block?: boolean;
+  /** nexus's `.btn-d` / `.btn-ok` — a tinted ghost button for a destructive
+   * or affirming action that shouldn't carry the full gradient. */
+  tone?: 'bad' | 'good';
   style?: ViewStyle;
 }) {
   const { palette } = useWebTheme();
+  const m = block ? BLOCK_METRICS : BTN_METRICS[size];
+  const fg = tone === 'bad' ? palette.bad : tone === 'good' ? palette.good : palette.text;
+  const bg = tone === 'bad' ? palette.badBg : tone === 'good' ? palette.goodBg : palette.panel;
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
-        s2.btnFill,
-        { borderRadius: 13, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.panel },
+        {
+          paddingVertical: m.py,
+          paddingHorizontal: m.px,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: m.radius,
+          borderWidth: 1,
+          borderColor: tone ? 'transparent' : palette.border,
+          backgroundColor: bg,
+        } as ViewStyle,
+        !block && ({ alignSelf: 'flex-start' } as ViewStyle),
         disabled && { opacity: 0.55 },
         pressed && !disabled && { backgroundColor: palette.hover },
         style,
       ]}
     >
-      <Text style={{ color: palette.text, fontSize: 14.5, fontWeight: '700' }}>{label}</Text>
+      <Text style={[m.text, { color: fg }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -313,27 +394,25 @@ export function GlassField({
   const { palette } = useWebTheme();
   return (
     <View style={{ marginBottom: 16 }}>
-      <Text style={{ fontSize: 11, fontWeight: '700', color: palette.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 7 }}>
-        {label}
-      </Text>
+      <Text style={[T.fieldLabel, { color: palette.muted, marginBottom: 6 }]}>{label}</Text>
       <TextInput
         placeholderTextColor={palette.muted}
         {...props}
         style={[
+          T.input,
           {
             backgroundColor: palette.hover,
             borderWidth: 1,
             borderColor: palette.border,
-            borderRadius: 13,
-            paddingHorizontal: 14,
-            paddingVertical: 13,
-            fontSize: 14.5,
+            borderRadius: 11,
+            paddingHorizontal: 13,
+            paddingVertical: 11,
             color: palette.text,
           },
           props.style,
         ]}
       />
-      {hint ? <Text style={{ fontSize: 11.5, color: palette.muted, marginTop: 6 }}>{hint}</Text> : null}
+      {hint ? <Text style={[T.cardHint, { color: palette.muted, marginTop: 6 }]}>{hint}</Text> : null}
     </View>
   );
 }
@@ -479,11 +558,11 @@ export function WorkerCell({
         </ExpoLinearGradient>
       )}
       <View style={{ minWidth: 0 }}>
-        <Text style={{ fontSize: 12.5, fontWeight: '700', color: palette.text }} numberOfLines={1}>
+        <Text style={[T.cellName, { color: palette.text }]} numberOfLines={1}>
           {name}
         </Text>
         {sub ? (
-          <Text style={{ fontSize: 10.5, color: palette.muted }} numberOfLines={1}>
+          <Text style={[T.cellSub, { color: palette.muted }]} numberOfLines={1}>
             {sub}
           </Text>
         ) : null}
@@ -685,9 +764,9 @@ export function Chip({
           colors={[palette.accent, palette.accent2]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          style={{ paddingHorizontal: 14, paddingVertical: 8 }}
+          style={{ paddingHorizontal: 12, paddingVertical: 4.5 }}
         >
-          <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#fff' }}>{label}</Text>
+          <Text style={{ fontFamily: BODY.semibold, fontSize: 11, color: '#fff' }}>{label}</Text>
         </ExpoLinearGradient>
       </Pressable>
     );
@@ -699,37 +778,44 @@ export function Chip({
       accessibilityState={{ selected: false }}
       style={({ pressed }) => [
         {
-          paddingHorizontal: 14,
-          paddingVertical: 8,
-          borderRadius: 999,
+          paddingHorizontal: 12,
+          paddingVertical: 4.5,
+          borderRadius: SP.radiusPill,
           borderWidth: 1,
           borderColor: palette.border,
-          backgroundColor: palette.panel,
+          backgroundColor: palette.hover,
         } as ViewStyle,
-        pressed ? { backgroundColor: palette.hover } : null,
+        pressed ? { borderColor: palette.accent2 } : null,
       ]}
     >
-      <Text style={{ fontSize: 12.5, fontWeight: '600', color: palette.muted }}>{label}</Text>
+      <Text style={{ fontFamily: BODY.semibold, fontSize: 11, color: palette.muted }}>{label}</Text>
     </Pressable>
   );
 }
 
 /* ---------------------------------------------------------------- Pill --- */
 
-export type WebPillTone = 'good' | 'bad' | 'info' | 'muted';
+/** nexus's `.tag` variants: `t-ok`/`t-bad`/`t-warn`/`t-blue`/`t-violet`/
+ * `t-mut`/`t-brand`. 'warn' and 'brand' are new here — the old four-tone set
+ * had to flatten "pending" and "needs attention" into the same blue or red,
+ * which is exactly the kind of thing that makes a status column read as
+ * noise instead of information. */
+export type WebPillTone = 'good' | 'bad' | 'warn' | 'info' | 'muted' | 'brand';
 
 export function WebPill({ label, tone = 'muted' }: { label: string; tone?: WebPillTone }) {
   const { palette } = useWebTheme();
   const map: Record<WebPillTone, { fg: string; bg: string }> = {
     good: { fg: palette.good, bg: palette.goodBg },
     bad: { fg: palette.bad, bg: palette.badBg },
+    warn: { fg: palette.warn, bg: palette.warnBg },
     info: { fg: palette.info, bg: palette.infoBg },
     muted: { fg: palette.muted, bg: palette.hover },
+    brand: { fg: palette.accent2, bg: palette.accentBg },
   };
   const c = map[tone];
   return (
-    <View style={{ alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: c.bg }}>
-      <Text style={{ fontSize: 10.5, fontWeight: '700', color: c.fg }}>{label}</Text>
+    <View style={{ alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: SP.radiusPill, backgroundColor: c.bg }}>
+      <Text style={[T.tag, { color: c.fg }]}>{label}</Text>
     </View>
   );
 }
@@ -759,15 +845,14 @@ export function DataTable({
 }) {
   const { palette } = useWebTheme();
   return (
-    <View style={{ backgroundColor: palette.panelSolid, borderWidth: 1, borderColor: palette.border, borderRadius: 15, overflow: 'hidden' }}>
+    <View style={{ backgroundColor: palette.panel, borderWidth: 1, borderColor: palette.border, borderRadius: SP.radius, overflow: 'hidden' }}>
       <View
         style={[
           {
             flexDirection: 'row',
             borderBottomWidth: 1,
             borderBottomColor: palette.border,
-            paddingVertical: 11,
-            paddingHorizontal: 6,
+            paddingVertical: SP.thPadY,
             backgroundColor: palette.bg2,
           },
           webOnlyStyle({ position: 'sticky', top: 0, zIndex: 2 }),
@@ -776,17 +861,16 @@ export function DataTable({
         {columns.map((c) => (
           <Text
             key={c.key}
-            style={{
-              flex: c.flex ?? 1,
-              width: c.width,
-              paddingHorizontal: 8,
-              fontSize: 10,
-              fontWeight: '800',
-              letterSpacing: 0.8,
-              textTransform: 'uppercase',
-              color: palette.muted2,
-              textAlign: c.align ?? 'left',
-            }}
+            style={[
+              T.th,
+              {
+                flex: c.flex ?? 1,
+                width: c.width,
+                paddingHorizontal: SP.cellPadX,
+                color: palette.muted2,
+                textAlign: c.align ?? 'left',
+              },
+            ]}
           >
             {c.label}
           </Text>
@@ -809,13 +893,14 @@ export function DataRow({
   index?: number;
 }) {
   const { palette } = useWebTheme();
+  // nexus's `td`: 10px/14px padding, a hairline between every row, and no
+  // zebra striping — the hover tint is what distinguishes rows, which reads
+  // far cleaner at this density than alternating backgrounds did.
   const base: ViewStyle = {
     flexDirection: 'row',
-    paddingVertical: 11,
-    paddingHorizontal: 6,
+    paddingVertical: SP.cellPadY,
     borderTopWidth: index === 0 ? 0 : 1,
     borderTopColor: palette.border,
-    backgroundColor: index % 2 === 1 ? palette.rowAlt : 'transparent',
   };
   const Wrap = onPress ? Pressable : View;
   return (
@@ -828,20 +913,17 @@ export function DataRow({
           style={{
             flex: c.flex ?? 1,
             width: c.width,
-            paddingHorizontal: 8,
+            paddingHorizontal: SP.cellPadX,
             justifyContent: 'center',
             alignItems: c.align === 'right' ? 'flex-end' : 'flex-start',
           }}
         >
           {typeof values[c.key] === 'string' || typeof values[c.key] === 'number' ? (
             <Text
-              style={{
-                fontSize: 12.5,
-                color: palette.text,
-                textAlign: c.align ?? 'left',
-                fontFamily: c.align === 'right' ? FONT_MONO : undefined,
-                fontVariant: c.align === 'right' ? ['tabular-nums'] : undefined,
-              }}
+              style={[
+                c.align === 'right' ? T.figure : T.cell,
+                { color: palette.text, textAlign: c.align ?? 'left' },
+              ]}
             >
               {values[c.key]}
             </Text>
@@ -875,10 +957,10 @@ export function WebSection({
   return (
     <View style={[{ marginBottom: 22 }, style]}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
-        <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text }}>{title}</Text>
+        <Text style={[T.cardTitle, { color: palette.text }]}>{title}</Text>
         {link ? (
           <Pressable onPress={onLinkPress} hitSlop={8}>
-            <Text style={{ fontSize: 11.5, color: palette.accent, fontWeight: '600' }}>{link}</Text>
+            <Text style={[T.bodySm, { color: palette.accent2, fontFamily: BODY.semibold }]}>{link}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -894,12 +976,10 @@ export function WebPageHeader({ eyebrow, title, sub }: { eyebrow?: string; title
   return (
     <View style={{ marginBottom: 18 }}>
       {eyebrow ? (
-        <Text style={{ fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', color: palette.accent, fontWeight: '700', marginBottom: 6 }}>
-          {eyebrow}
-        </Text>
+        <Text style={[T.microLabel, { color: palette.accent2, marginBottom: 6 }]}>{eyebrow}</Text>
       ) : null}
-      <Text style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: '700', color: palette.text }}>{title}</Text>
-      {sub ? <Text style={{ fontSize: 13, color: palette.muted, marginTop: 3 }}>{sub}</Text> : null}
+      <Text style={{ fontFamily: DISPLAY.bold, fontSize: 21, letterSpacing: -0.5, color: palette.text }}>{title}</Text>
+      {sub ? <Text style={[T.bodySm, { color: palette.muted, marginTop: 3, lineHeight: 17 }]}>{sub}</Text> : null}
     </View>
   );
 }

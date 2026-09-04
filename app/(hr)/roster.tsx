@@ -100,8 +100,10 @@ export default function HrRoster() {
       />
 
       <GlassButton
-        label="Register a supervisor"
+        label="＋ Register a supervisor"
         onPress={() => router.push('/(hr)/register-supervisor')}
+        size="sm"
+        block={false}
         style={{ marginBottom: 18 }}
       />
 

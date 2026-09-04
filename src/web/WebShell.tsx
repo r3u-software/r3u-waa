@@ -18,6 +18,7 @@ import {
 } from '../components/icons';
 import { useWebTheme, webOnlyStyle } from './webTheme';
 import { ColorThemeSwitcher, ModeSwitcher } from './webUi';
+import { BODY, DISPLAY, T } from './nexusType';
 
 /**
  * The R3U Suite glass shell for HR/Admin + Platform Owner —
@@ -200,7 +201,7 @@ export function WebShell({
                         />
                       ) : null}
                       {item.icon(isActive ? palette.text : palette.muted, 16)}
-                      <Text style={[s.navText, { color: isActive ? palette.text : palette.muted }]}>
+                      <Text style={[isActive ? s.navTextActive : s.navText, { color: isActive ? palette.text : palette.muted }]}>
                         {item.label}
                       </Text>
                     </Pressable>
@@ -351,19 +352,25 @@ const s = StyleSheet.create({
     padding: 4,
   },
   brandMarkImg: { width: '100%', height: '100%' },
-  brandName: { fontSize: 14.5, fontWeight: '700', lineHeight: 17 },
-  brandSub: { fontSize: 10.5, marginTop: 1 },
-  groupLabel: { fontSize: 9.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.6, paddingHorizontal: 10, paddingTop: 13, paddingBottom: 5 },
-  navItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10, marginBottom: 2, position: 'relative' } as ViewStyle,
-  navActiveBar: { position: 'absolute', left: -1, top: '22%', bottom: '22%', width: 3, borderRadius: 3 } as ViewStyle,
-  navText: { fontSize: 13, fontWeight: '600' },
+  // nexus's `.logo b` / `.logo small`: 17px Outfit wordmark over a 9px,
+  // 2.4px-tracked uppercase kicker.
+  brandName: { fontFamily: DISPLAY.bold, fontSize: 16, letterSpacing: 0.4, lineHeight: 19 },
+  brandSub: { fontFamily: BODY.bold, fontSize: 8.5, letterSpacing: 2, textTransform: 'uppercase', marginTop: 1 },
+  // `.nav-sec`: 9px / 800 / 2px tracking.
+  groupLabel: { fontFamily: BODY.bold, fontSize: 9, textTransform: 'uppercase', letterSpacing: 2, paddingHorizontal: 10, paddingTop: 14, paddingBottom: 5 },
+  // `.nitem`: 8.5px/12px padding, 11px radius, 12.8px label.
+  navItem: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 12, paddingVertical: 8.5, borderRadius: 11, marginBottom: 2, position: 'relative' } as ViewStyle,
+  navActiveBar: { position: 'absolute', left: -1, top: '20%', bottom: '20%', width: 3, borderRadius: 3 } as ViewStyle,
+  navText: { fontFamily: BODY.medium, fontSize: 12.8 },
+  navTextActive: { fontFamily: BODY.semibold, fontSize: 12.8 },
 
   main: { flex: 1, minWidth: 0 },
-  topbar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 24, paddingVertical: 13, borderBottomWidth: 1, flexWrap: 'wrap' },
-  topTitle: { fontSize: 17, fontWeight: '700' },
-  topSub: { fontSize: 12, marginTop: 1 },
-  search: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 11, paddingHorizontal: 13, paddingVertical: 8, minWidth: 200 },
-  searchText: { fontSize: 12.5 },
+  // `.topbar`: 62px tall, 0 20px padding.
+  topbar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, height: 62, borderBottomWidth: 1 },
+  topTitle: T.pageTitle,
+  topSub: { ...T.crumb, marginTop: 1 },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 11, paddingHorizontal: 13, paddingVertical: 8, minWidth: 200, maxWidth: 380, flex: 1 },
+  searchText: { fontFamily: BODY.regular, fontSize: 12.5 },
   content: { paddingBottom: 40 },
   contentInner: { padding: 24, width: '100%', maxWidth: 1180, alignSelf: 'center' },
 
@@ -381,11 +388,12 @@ const s = StyleSheet.create({
   panelLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 9 },
   panelDivider: { height: 1, marginVertical: 13 },
 
-  userChip: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 6, paddingRight: 11 },
-  avatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontWeight: '700', fontSize: 11 },
-  userName: { fontSize: 12.5, fontWeight: '600' },
-  userRole: { fontSize: 10.5, marginTop: 1 },
+  // `.uchip` / `.avatar` / `.un` / `.ur`.
+  userChip: { flexDirection: 'row', alignItems: 'center', gap: 9, borderWidth: 1, borderRadius: 999, paddingVertical: 4, paddingHorizontal: 5, paddingRight: 13 },
+  avatar: { width: 31, height: 31, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontFamily: BODY.bold, fontSize: 11 },
+  userName: { fontFamily: BODY.bold, fontSize: 12, lineHeight: 14 },
+  userRole: { fontFamily: BODY.regular, fontSize: 9.5, marginTop: 1 },
   userMenu: {
     position: 'absolute',
     top: 46,

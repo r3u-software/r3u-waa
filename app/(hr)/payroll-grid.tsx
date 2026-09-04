@@ -305,23 +305,28 @@ export default function HrPayroll() {
 
         {error ? <ErrorNote message={error} /> : null}
 
+        {/* nexus's `.toolbar`: one compact row of inline actions, primary
+            first — not three stacked full-width slabs above the data. */}
         <View style={s.actionRow}>
           <GlassButton
-            label={run?.status === 'draft' ? 'Regenerate run' : 'Start a run'}
+            label={run?.status === 'draft' ? '▶ Regenerate run' : '▶ Start a run'}
             onPress={openGenerator}
-            style={{ flex: 1 }}
+            size="sm"
+            block={false}
           />
           <GlassOutlineButton
             label={`Advances${pendingAdvances.length ? ` (${pendingAdvances.length})` : ''}`}
             onPress={() => router.push('/(hr)/cash-advances')}
-            style={{ flex: 1 }}
+            size="sm"
+            block={false}
+          />
+          <GlassOutlineButton
+            label="⚙ Payroll settings"
+            onPress={() => router.push('/(hr)/settings')}
+            size="sm"
+            block={false}
           />
         </View>
-        <GlassOutlineButton
-          label="Payroll settings"
-          onPress={() => router.push('/(hr)/settings')}
-          style={{ marginBottom: 22 }}
-        />
 
         {loading && !data ? (
           <Loader label="Loading runs" />
@@ -739,7 +744,7 @@ function DateBox({ label, value, onPress }: { label: string; value: Date; onPres
 }
 
 const s = StyleSheet.create({
-  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  actionRow: { flexDirection: 'row', gap: 9, marginBottom: 15, flexWrap: 'wrap', alignItems: 'center' },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
 
   runCard: { marginBottom: 18 },
