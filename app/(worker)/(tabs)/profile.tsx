@@ -2,11 +2,10 @@ import React from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession, useWorker } from '../../../src/lib/session';
-import { loadBiometricSession } from '../../../src/lib/biometricAuth';
 import { ProfileEditor } from '../../../src/components/ProfileEditor';
 import { initialsOf } from '../../../src/lib/format';
 import { useWebTheme } from '../../../src/web/webTheme';
-import { BiometricToggle, ColorThemeSwitcher, GlassCard, GlassOutlineButton, GlassScreen, ModeSwitcher, WebSection } from '../../../src/web/webUi';
+import { ColorThemeSwitcher, GlassCard, GlassOutlineButton, GlassScreen, ModeSwitcher, WebSection } from '../../../src/web/webUi';
 import { SignedImage } from '../../../src/components/SignedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -16,17 +15,10 @@ export default function WorkerProfile() {
   const { palette } = useWebTheme();
   const insets = useSafeAreaInsets();
 
-  async function confirmSignOut() {
-    // Quick sign-in survives a normal sign-out now (see signOut's own doc
-    // comment in session.tsx) — say so here too, since the old blanket
-    // "you will need your password" line is only true when it's off.
-    const record = await loadBiometricSession();
-    const quickSignInOn = !!record && record.identifierLabel === worker.login_code;
+  function confirmSignOut() {
     Alert.alert(
       'Sign out?',
-      quickSignInOn
-        ? 'You can sign back in with your fingerprint, face, or passcode — or your User ID and password.'
-        : 'You will need your User ID and password to get back in.',
+      'You will need your User ID and password to get back in.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Sign out', style: 'destructive', onPress: signOut },
@@ -63,8 +55,6 @@ export default function WorkerProfile() {
         </View>
 
         <ProfileEditor worker={worker} />
-
-        <BiometricToggle identifierLabel={worker.login_code} />
 
         <WebSection title="Appearance">
           <GlassCard style={{ gap: 16 }}>

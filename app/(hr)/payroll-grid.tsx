@@ -100,9 +100,18 @@ export default function HrPayroll() {
         borderBottomWidth: 1,
         borderBottomColor: palette.border,
       },
-      headRow: { backgroundColor: palette.hover },
+      // nexus-hris.html's th treatment: an uppercase, letter-spaced label on
+      // a distinct (not just "hover-tint") header band that stays pinned
+      // while the grid's own body scrolls under it.
+      headRow: { backgroundColor: palette.bg2, ...webOnlyStyle({ position: 'sticky', top: 0, zIndex: 2 }) },
       subtotalRow: { backgroundColor: palette.hover, borderBottomWidth: 0 },
-      headText: { fontSize: 9.5, letterSpacing: 0.5, color: palette.muted, fontWeight: '700' as const },
+      headText: {
+        fontSize: 9,
+        letterSpacing: 0.8,
+        textTransform: 'uppercase' as const,
+        color: palette.muted2,
+        fontWeight: '800' as const,
+      },
       name: { fontSize: 12.5, fontWeight: '700' as const, color: palette.text },
       sub: { fontSize: 10.5, color: palette.muted },
       body: { fontSize: 12, color: palette.text, fontVariant: ['tabular-nums'] as ('tabular-nums')[] },

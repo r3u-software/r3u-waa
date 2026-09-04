@@ -70,8 +70,7 @@
           "image": "./assets/splash-icon.png",
           "resizeMode": "contain"
         }
-      ],
-      "expo-secure-store"
+      ]
     ],
     "extra": {
       "router": {},

@@ -1,13 +1,15 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import React, { useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import { useSession } from '../lib/session';
 import { initialsOf } from '../lib/format';
 import {
   ChartIcon,
+  ChevronDownIcon,
   DoorExitIcon,
   GearIcon,
   LogoutIcon,
+  PaletteIcon,
   PayslipIcon,
   SearchIcon,
   SiteIcon,
@@ -23,6 +25,19 @@ import { ColorThemeSwitcher, ModeSwitcher } from './webUi';
  * `HrDashboardNav` (src/components/) on every screen that imports it; those
  * three stay exactly as they were for Worker/Supervisor's native tabs, which
  * this file never touches.
+ *
+ * Restyled against `nexus-hris.html` (2026-09-04, per the user's explicit
+ * direction to migrate the HR/Admin + Platform Owner web app onto it) — a
+ * visual-language reference only, not a second backend: every control here
+ * still drives the exact same 9 real screens/actions this app already has.
+ * Three structural moves taken from that reference: the active nav item's
+ * left accent bar (nexus's `.nitem.active::before`), the theme controls
+ * collapsed behind one 🎨 icon that opens a floating panel instead of
+ * sitting inline in the topbar at all times, and the user identity + sign
+ * out moving from the sidebar footer into a topbar chip + dropdown (nexus
+ * keeps the sidebar footer for an org/entity switcher, which this app has
+ * no equivalent feature for — HR/Admin belongs to exactly one company, so
+ * that slot is dropped rather than filled with a non-functional stand-in).
  */
 
 interface NavItem {
@@ -84,12 +99,19 @@ export function WebShell({
   children: React.ReactNode;
 }) {
   const { role, hrAdmin, platformOwner, signOut } = useSession();
-  const { palette, themeId, themes, setThemeId } = useWebTheme();
+  const { palette } = useWebTheme();
+  const [themePanelOpen, setThemePanelOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const isPlatformOwner = role === 'platform_owner';
   const groups = isPlatformOwner ? PLATFORM_OWNER_NAV : HR_NAV;
   const principal = isPlatformOwner ? platformOwner : hrAdmin;
   const roleLabel = isPlatformOwner ? 'Platform owner' : 'HR admin';
+
+  function closePopovers() {
+    setThemePanelOpen(false);
+    setUserMenuOpen(false);
+  }
 
   return (
     <View
@@ -101,7 +123,28 @@ export function WebShell({
         }),
       ]}
     >
-      <View style={s.shell}>
+      <View
+        style={s.shell}
+        // Click-outside-to-close, without a full-screen overlay Pressable:
+        // `topbar` and `sidebar` both set `backdropFilter`, which — like
+        // `filter`/`opacity<1`/`transform` — establishes its own CSS
+        // stacking context. An overlay `zIndex` can never out-rank content
+        // trapped inside a descendant's own stacking context regardless of
+        // how high the number is, so a real overlay here would need to sit
+        // *inside* every such context to work, which defeats the point of
+        // one shared catch-all. `onStartShouldSetResponder` sidesteps this
+        // entirely: it fires on every touch that starts anywhere in this
+        // subtree (same non-capturing technique `_layout.tsx` uses for idle-
+        // activity tracking), and returning `false` lets the touch continue
+        // on to whatever Pressable is actually under it — so a tap on the
+        // Appearance/Account buttons still closes popovers first, then
+        // immediately reopens the one that was tapped, once its own onPress
+        // fires on release.
+        onStartShouldSetResponder={() => {
+          if (themePanelOpen || userMenuOpen) closePopovers();
+          return false;
+        }}
+      >
         <View
           style={[
             s.sidebar,
@@ -110,13 +153,12 @@ export function WebShell({
           ]}
         >
           <View style={s.brandRow}>
-            <View
-              style={[
-                s.brandMark,
-                webOnlyStyle({ backgroundImage: `linear-gradient(135deg, ${palette.accent}, ${palette.accent2})` }),
-              ]}
-            >
-              <Text style={s.brandMarkText}>R3</Text>
+            {/* Real R3U wordmark (2026-09-04), replacing the gradient "R3"
+                placeholder in this shared HR/Admin + Platform Owner shell —
+                the source file has a solid white background, so it sits in
+                a plain white chip rather than directly on the dark sidebar. */}
+            <View style={s.brandMarkChip}>
+              <Image source={require('../../assets/r3u-logo.jpg')} style={s.brandMarkImg} resizeMode="contain" />
             </View>
             <View>
               <Text style={[s.brandName, { color: palette.text }]}>R3U WAA</Text>
@@ -149,6 +191,14 @@ export function WebShell({
                         !isActive && pressed ? { backgroundColor: palette.hover } : null,
                       ]}
                     >
+                      {isActive ? (
+                        <View
+                          style={[
+                            s.navActiveBar,
+                            webOnlyStyle({ backgroundImage: `linear-gradient(180deg, ${palette.accent}, ${palette.accent2})` }),
+                          ]}
+                        />
+                      ) : null}
                       {item.icon(isActive ? palette.text : palette.muted, 16)}
                       <Text style={[s.navText, { color: isActive ? palette.text : palette.muted }]}>
                         {item.label}
@@ -159,28 +209,6 @@ export function WebShell({
               </View>
             ))}
           </ScrollView>
-
-          <View style={[s.userChip, { backgroundColor: palette.panelSolid, borderColor: palette.border }]}>
-            <View
-              style={[
-                s.avatar,
-                webOnlyStyle({ backgroundImage: `linear-gradient(135deg, ${palette.accent}, ${palette.accent2})` }),
-              ]}
-            >
-              <Text style={s.avatarText}>{initialsOf(principal?.full_name)}</Text>
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[s.userName, { color: palette.text }]} numberOfLines={1}>
-                {principal?.full_name ?? roleLabel}
-              </Text>
-              <Text style={[s.userRole, { color: palette.muted }]} numberOfLines={1}>
-                {roleLabel}
-              </Text>
-            </View>
-            <Pressable onPress={signOut} accessibilityLabel="Sign out" hitSlop={8}>
-              <LogoutIcon color={palette.muted} size={16} />
-            </Pressable>
-          </View>
         </View>
 
         <View style={s.main}>
@@ -205,14 +233,86 @@ export function WebShell({
               <Text style={[s.searchText, { color: palette.muted }]}>Search workers, runs, sites…</Text>
             </View>
 
-            <ColorThemeSwitcher compact />
-
-            <ModeSwitcher compact />
-
             {actions}
+
+            <View style={s.popoverAnchor}>
+              <Pressable
+                onPress={() => {
+                  setUserMenuOpen(false);
+                  setThemePanelOpen((v) => !v);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Appearance"
+                style={[s.iconBtn, { borderColor: palette.border, backgroundColor: palette.panelSolid }]}
+              >
+                <PaletteIcon color={palette.text} size={16} />
+              </Pressable>
+              {themePanelOpen ? (
+                <View
+                  style={[
+                    s.themePanel,
+                    { backgroundColor: palette.panelSolid, borderColor: palette.border },
+                    webOnlyStyle({ boxShadow: '0 24px 60px rgba(0,0,0,0.4)' }),
+                  ]}
+                >
+                  <Text style={[s.panelLabel, { color: palette.muted }]}>COLOR THEME</Text>
+                  <ColorThemeSwitcher />
+                  <View style={[s.panelDivider, { backgroundColor: palette.border }]} />
+                  <Text style={[s.panelLabel, { color: palette.muted }]}>DISPLAY</Text>
+                  <ModeSwitcher />
+                </View>
+              ) : null}
+            </View>
+
+            <View style={s.popoverAnchor}>
+              <Pressable
+                onPress={() => {
+                  setThemePanelOpen(false);
+                  setUserMenuOpen((v) => !v);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Account menu"
+                style={[s.userChip, { backgroundColor: palette.panelSolid, borderColor: palette.border }]}
+              >
+                <View
+                  style={[
+                    s.avatar,
+                    webOnlyStyle({ backgroundImage: `linear-gradient(135deg, ${palette.accent}, ${palette.accent2})` }),
+                  ]}
+                >
+                  <Text style={s.avatarText}>{initialsOf(principal?.full_name)}</Text>
+                </View>
+                <View style={{ minWidth: 0, maxWidth: 130 }}>
+                  <Text style={[s.userName, { color: palette.text }]} numberOfLines={1}>
+                    {principal?.full_name ?? roleLabel}
+                  </Text>
+                  <Text style={[s.userRole, { color: palette.muted }]} numberOfLines={1}>
+                    {roleLabel}
+                  </Text>
+                </View>
+                <ChevronDownIcon color={palette.muted} size={14} />
+              </Pressable>
+              {userMenuOpen ? (
+                <View
+                  style={[
+                    s.userMenu,
+                    { backgroundColor: palette.panelSolid, borderColor: palette.border },
+                    webOnlyStyle({ boxShadow: '0 24px 60px rgba(0,0,0,0.4)' }),
+                  ]}
+                >
+                  <Pressable
+                    onPress={signOut}
+                    style={({ pressed }) => [s.userMenuItem, pressed && { backgroundColor: palette.hover }]}
+                  >
+                    <LogoutIcon color={palette.bad} size={15} />
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: palette.bad }}>Sign out</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
           </View>
 
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={s.content}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={s.content} onScrollBeginDrag={closePopovers}>
             <View style={s.contentInner}>{children}</View>
           </ScrollView>
         </View>
@@ -241,25 +341,65 @@ const s = StyleSheet.create({
     paddingBottom: 14,
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 8, paddingBottom: 18 },
-  brandMark: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  brandMarkText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  brandMarkChip: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    padding: 4,
+  },
+  brandMarkImg: { width: '100%', height: '100%' },
   brandName: { fontSize: 14.5, fontWeight: '700', lineHeight: 17 },
   brandSub: { fontSize: 10.5, marginTop: 1 },
-  groupLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, paddingHorizontal: 10, paddingTop: 12, paddingBottom: 5 },
-  navItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10, marginBottom: 2 } as ViewStyle,
+  groupLabel: { fontSize: 9.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.6, paddingHorizontal: 10, paddingTop: 13, paddingBottom: 5 },
+  navItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10, marginBottom: 2, position: 'relative' } as ViewStyle,
+  navActiveBar: { position: 'absolute', left: -1, top: '22%', bottom: '22%', width: 3, borderRadius: 3 } as ViewStyle,
   navText: { fontSize: 13, fontWeight: '600' },
-  userChip: { flexDirection: 'row', alignItems: 'center', gap: 9, borderWidth: 1, borderRadius: 11, padding: 8, marginTop: 8 },
-  avatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontWeight: '700', fontSize: 11 },
-  userName: { fontSize: 12.5, fontWeight: '600' },
-  userRole: { fontSize: 10.5, marginTop: 1 },
 
   main: { flex: 1, minWidth: 0 },
-  topbar: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 24, paddingVertical: 15, borderBottomWidth: 1, flexWrap: 'wrap' },
+  topbar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 24, paddingVertical: 13, borderBottomWidth: 1, flexWrap: 'wrap' },
   topTitle: { fontSize: 17, fontWeight: '700' },
   topSub: { fontSize: 12, marginTop: 1 },
   search: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 11, paddingHorizontal: 13, paddingVertical: 8, minWidth: 200 },
   searchText: { fontSize: 12.5 },
   content: { paddingBottom: 40 },
   contentInner: { padding: 24, width: '100%', maxWidth: 1180, alignSelf: 'center' },
+
+  iconBtn: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  themePanel: {
+    position: 'absolute',
+    top: 46,
+    right: 0,
+    width: 260,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    zIndex: 90,
+  } as ViewStyle,
+  panelLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 9 },
+  panelDivider: { height: 1, marginVertical: 13 },
+
+  userChip: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 6, paddingRight: 11 },
+  avatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontWeight: '700', fontSize: 11 },
+  userName: { fontSize: 12.5, fontWeight: '600' },
+  userRole: { fontSize: 10.5, marginTop: 1 },
+  userMenu: {
+    position: 'absolute',
+    top: 46,
+    right: 0,
+    width: 180,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 6,
+    zIndex: 90,
+  } as ViewStyle,
+  userMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 11, paddingVertical: 10, borderRadius: 10 },
+  // Keeps each dropdown panel stacked above its topbar siblings (the search
+  // box, the other icon button) within `topbar`'s own local stacking context
+  // — `topbar` sets `backdropFilter`, which establishes one, so this only
+  // ever has to win locally, never against anything outside it.
+  popoverAnchor: { position: 'relative', zIndex: 100 } as ViewStyle,
 });

@@ -331,62 +331,26 @@ export function MoonIcon(p: IconProps) {
   );
 }
 
-/** Biometric quick-login glyph — a fingerprint, standing in generically for
- * "fingerprint, Face ID, or device passcode" (the actual method used is
- * whatever the phone itself picks; the button doesn't need to guess which). */
-export function FingerprintIcon(p: IconProps) {
-  return (
-    <Svg {...base(p)}>
-      <Path d="M12 3.5c-4.7 0-8.5 3.8-8.5 8.5 0 1.7.2 3 .6 4" />
-      <Path d="M12 3.5c4.7 0 8.5 3.8 8.5 8.5 0 1-.1 2.2-.3 3" />
-      <Path d="M7.5 20.5A10 10 0 0 1 6 12c0-3.3 2.7-6 6-6s6 2.7 6 6c0 .6 0 1.2-.1 1.7" />
-      <Path d="M9.8 20.2C9 18 8.5 15.3 8.5 12a3.5 3.5 0 1 1 7 0c0 2 .3 3.9.9 5.5" />
-      <Path d="M12 12v1.5c0 2.4.5 4.7 1.4 6.8" />
-    </Svg>
-  );
-}
-
-/** Face ID glyph — corner brackets around a simple face, matching the
- * scan-frame convention every platform uses for facial recognition. */
-export function FaceIdIcon(p: IconProps) {
-  return (
-    <Svg {...base(p)}>
-      <Path d="M3 8V5.5A2.5 2.5 0 0 1 5.5 3H8" />
-      <Path d="M16 3h2.5A2.5 2.5 0 0 1 21 5.5V8" />
-      <Path d="M21 16v2.5a2.5 2.5 0 0 1-2.5 2.5H16" />
-      <Path d="M8 21H5.5A2.5 2.5 0 0 1 3 18.5V16" />
-      <Circle cx="9" cy="10.5" r="0.9" fill={p.color ?? colors.ink} stroke="none" />
-      <Circle cx="15" cy="10.5" r="0.9" fill={p.color ?? colors.ink} stroke="none" />
-      <Path d="M9 15c1 .8 2 1.1 3 1.1s2-.3 3-1.1" />
-    </Svg>
-  );
-}
-
-/** Phone-passcode glyph — a keypad grid, for "sign in with your device
- * passcode" as a distinct option from face/fingerprint. */
-export function PasscodeIcon(p: IconProps) {
-  return (
-    <Svg {...base(p)}>
-      <Circle cx="7" cy="6.5" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
-      <Circle cx="12" cy="6.5" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
-      <Circle cx="17" cy="6.5" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
-      <Circle cx="7" cy="12" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
-      <Circle cx="12" cy="12" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
-      <Circle cx="17" cy="12" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
-      <Circle cx="7" cy="17.5" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
-      <Circle cx="12" cy="17.5" r="1.15" fill={p.color ?? colors.ink} stroke="none" />
-      <Path d="M15.5 15.5h4a1 1 0 0 1 1 1v3.5a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V16.5a1 1 0 0 1 1-1Z" />
-      <Path d="M16.5 15.5v-1.3a1.5 1.5 0 0 1 3 0v1.3" />
-    </Svg>
-  );
-}
-
 /** "System" mode glyph — a monitor, for the light/dark/system 3-way switcher. */
 export function MonitorIcon(p: IconProps) {
   return (
     <Svg {...base(p)}>
       <Rect x="2.5" y="4" width="19" height="13" rx="1.6" />
       <Path d="M8.5 21h7M12 17v4" />
+    </Svg>
+  );
+}
+
+/** Theme-panel trigger — a paint palette, nexus-hris.html's 🎨 icon
+ * translated to this app's line-drawn icon set. */
+export function PaletteIcon(p: IconProps) {
+  return (
+    <Svg {...base(p)}>
+      <Path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.7 1.6-1.5 0-.4-.15-.75-.4-1a1.5 1.5 0 0 1 1.1-2.5H16a4 4 0 0 0 4-4c0-5-3.6-9-8-9Z" />
+      <Circle cx="7.5" cy="11" r="1.1" fill={p.color ?? colors.ink} stroke="none" />
+      <Circle cx="9.5" cy="7.2" r="1.1" fill={p.color ?? colors.ink} stroke="none" />
+      <Circle cx="14.5" cy="7.2" r="1.1" fill={p.color ?? colors.ink} stroke="none" />
+      <Circle cx="16.5" cy="11" r="1.1" fill={p.color ?? colors.ink} stroke="none" />
     </Svg>
   );
 }

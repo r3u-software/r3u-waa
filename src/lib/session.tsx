@@ -9,7 +9,6 @@ import React, {
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
-import { loadBiometricSession, syncBiometricRefreshToken } from './biometricAuth';
 import type { WaaHrAdmin, WaaPlatformOwner, WaaSupervisor, WaaWorker } from './types';
 
 export type Role = 'worker' | 'supervisor' | 'hr_admin' | 'platform_owner';
@@ -53,35 +52,17 @@ interface SessionState {
   refreshProfile: () => Promise<void>;
   /**
    * Explicit, person-initiated sign-out (the "Sign out" button in Profile).
-   *
-   * "Quick sign-in" (Profile's biometric toggle) is a lasting device
-   * preference now, not a one-off offer — so this must NOT treat every
-   * sign-out as "forget this device" the way it originally did. Real report
-   * from testing: enabling the toggle, then tapping Sign out, left the
-   * login screen with no biometric icons at all, because this used to
-   * unconditionally revoke globally and wipe the saved record regardless of
-   * why the person was signing out.
-   *
-   * Now conditional on whether a biometric record actually exists for this
-   * device: if so, signs out with Supabase's "local" scope (ends this
-   * session without revoking the refresh token that record holds) and
-   * leaves the record alone — only the toggle itself should clear it from
-   * here on. If no record exists, behaves exactly as before: a full,
-   * global revoke, matching the confirmation dialog's "You will need your
-   * User ID and password to get back in."
+   * Full/"global" Supabase scope — revokes the refresh token server-side,
+   * matching the confirmation dialog's "You will need your User ID and
+   * password to get back in."
    */
   signOut: () => Promise<void>;
   /**
    * The 5-minute-idle timeout's sign-out — "both mobile and web app will
    * logout after 5 mins no activities." Ends the on-screen session (the root
-   * guard bounces straight back to /login) but always uses Supabase's
-   * "local" scope, unconditionally (unlike `signOut` above, which only does
-   * this when a biometric record exists) — an idle timeout should never
-   * feel like a hard revoke regardless of whether biometric quick-login
-   * happens to be in play, since the whole point is it's not a deliberate
-   * choice to leave. Native only in practice (`useIdleLogout` fires on web
-   * too, where local vs. global scope makes no practical difference since
-   * there is no biometric record to preserve either way).
+   * guard bounces straight back to /login) using Supabase's "local" scope —
+   * an idle timeout is not a deliberate choice to leave, so it doesn't need
+   * the full server-side revoke `signOut` does.
    */
   idleSignOut: () => Promise<void>;
 }
@@ -198,9 +179,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
       setSession(data.session);
-      if (data.session) {
-        void syncBiometricRefreshToken(data.session.refresh_token, data.session.user.id);
-      }
       await resolveRole(data.session?.user.id);
       resolvedUserId.current = data.session?.user.id;
       if (active) setLoading(false);
@@ -209,16 +187,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (!active) return;
       const nextUserId = newSession?.user.id;
-      // Keep the biometric quick-sign-in record's refresh token current.
-      // Supabase rotates refresh tokens on every use, including the
-      // client's own silent background refreshes — without this, the
-      // stored token goes stale the first time the session refreshes and
-      // the next biometric attempt fails as "expired". Fire-and-forget:
-      // a SecureStore write, not a Supabase call, so no deadlock risk
-      // inside this callback, and nothing here should wait on it.
-      if (newSession) {
-        void syncBiometricRefreshToken(newSession.refresh_token, newSession.user.id);
-      }
       // `loading` drives the root guard's full-screen splash, which unmounts
       // whatever is on screen. Only a genuine identity change (sign-in,
       // sign-out) warrants that. Same-user events — TOKEN_REFRESHED, and
@@ -255,26 +223,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    // "Quick sign-in" (Profile's biometric toggle) is meant to be a lasting
-    // device preference, not something a routine sign-out quietly throws
-    // away — a real report from testing: enabling it, then tapping Sign
-    // out, left the login screen with no biometric icons at all, because
-    // this used to unconditionally revoke globally and wipe the saved
-    // record every time, no matter why.
-    //
-    // Now: only when a biometric record actually exists do we switch to a
-    // "local" scope sign-out (ends this session without revoking the
-    // refresh token that record holds) and leave the record alone — the
-    // toggle itself is the only thing that should clear it from here on.
-    // No record means biometric was never turned on for this account on
-    // this device, so there's nothing to preserve and this behaves exactly
-    // as before: a full, global revoke.
-    const record = await loadBiometricSession();
-    if (record) {
-      await supabase.auth.signOut({ scope: 'local' });
-    } else {
-      await supabase.auth.signOut();
-    }
+    await supabase.auth.signOut();
     clearRoleState();
   }, [clearRoleState]);
 

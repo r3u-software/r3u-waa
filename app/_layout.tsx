@@ -98,8 +98,8 @@ function RootNavigator() {
   // the onStartShouldSetResponder on the root View below, which observes
   // every touch without capturing it away from whatever child handles it.
   // `idleSignOut`, not `signOut` — see its doc comment in session.tsx: same
-  // "back to /login" outcome, but it preserves the refresh token biometric
-  // quick-login relies on instead of revoking it on every single timeout.
+  // "back to /login" outcome, but local Supabase scope rather than a full
+  // server-side revoke, since idling out isn't a deliberate choice to leave.
   const { markActivity } = useIdleLogout(!!session, idleSignOut);
 
   const group = segments[0];
