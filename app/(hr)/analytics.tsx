@@ -11,9 +11,12 @@ import {
   Chip,
   DataRow,
   DataTable,
+  DonutChart,
   GlassCard,
   GlassPanel,
   MetricCard,
+  MiniBarChart,
+  RingChart,
   WebPageHeader,
 } from '../../src/web/webUi';
 import {
@@ -161,6 +164,21 @@ const GRANULARITIES: { key: Granularity; label: string }[] = [
 
 /** bit0 = Mon … bit6 = Sun, matching the edge function's mask. */
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/** Rotating, theme-consistent swatch set for the Leave donut's segments —
+ * leave types are per-company free text (`waa_deduction_types`-style
+ * settings), so there is no fixed enum to hand-map colors to; this just
+ * cycles through palette tones that already exist rather than inventing new
+ * hex literals the light/dark themes wouldn't know about. */
+const LEAVE_COLORS: ((p: ReturnType<typeof useWebTheme>['palette']) => string)[] = [
+  (p) => p.accent2,
+  (p) => p.good,
+  (p) => p.warn,
+  (p) => p.info,
+  (p) => p.bad,
+  (p) => p.accent,
+  (p) => p.muted2,
+];
 
 /** Derives the previous period's absolute value from a real trend_pct —
  * never invented, just algebra on what the API actually returned. Null
@@ -383,8 +401,15 @@ export default function HrAnalytics() {
               </View>
             </GlassPanel>
 
-            <GlassPanel title="Work week" hint="Denominator behind the absence rate above" style={s.panelItem}>
-              <Text style={{ fontSize: 11.5, color: palette.muted, lineHeight: 17, marginBottom: 12 }}>
+            <GlassPanel title="Work week" hint="Denominator behind the attendance rate below" style={s.panelItem}>
+              <RingChart
+                pct={100 - m.attendance.absence_rate.value}
+                value={`${(100 - m.attendance.absence_rate.value).toFixed(1)}%`}
+                label="attendance rate"
+                color={m.attendance.absence_rate.value > 10 ? palette.warn : palette.good}
+                size={104}
+              />
+              <Text style={{ fontSize: 11.5, color: palette.muted, lineHeight: 17, marginTop: 14, marginBottom: 12 }}>
                 Which days count as work days. Possible worker-days is active workers multiplied by the work
                 days in the period, so changing it re-scales every attendance figure above.
               </Text>
@@ -436,32 +461,36 @@ export default function HrAnalytics() {
 
           <View style={s.grid2}>
             <GlassPanel title="Headcount" hint="New hires and separations this period" style={s.panelItem}>
-              <DetailRow label="New hires" value={m.headcount.new_hires.value.toLocaleString()} />
-              <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 10 }}>
-                <Text style={{ fontSize: 10.5, fontWeight: '700', color: palette.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
-                  Separations
-                </Text>
-                <DetailRow label="Terminated" value={(m.headcount.separations?.terminated ?? 0).toLocaleString()} />
-                <DetailRow label="AWOL" value={(m.headcount.separations?.awol ?? 0).toLocaleString()} />
-                <DetailRow label="Resigned" value={(m.headcount.separations?.resigned ?? 0).toLocaleString()} />
+              <DetailRow label="New hires" value={m.headcount.new_hires.value.toLocaleString()} strong />
+              <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 14 }}>
+                <Text style={[{ marginBottom: 2 }]} />
+                <MiniBarChart
+                  height={90}
+                  bars={[
+                    { label: 'Terminated', value: m.headcount.separations?.terminated ?? 0, color: palette.bad },
+                    { label: 'AWOL', value: m.headcount.separations?.awol ?? 0, color: palette.warn },
+                    { label: 'Resigned', value: m.headcount.separations?.resigned ?? 0, color: palette.muted2 },
+                  ]}
+                />
               </View>
             </GlassPanel>
 
-            <GlassPanel title="Leave" hint="Paid vs unpaid, and by type" style={s.panelItem}>
-              <DetailRow label="Paid days" value={m.leave.paid_days.value.toLocaleString()} />
-              <DetailRow label="Unpaid days" value={m.leave.unpaid_days.value.toLocaleString()} />
-              <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 10 }}>
-                <Text style={{ fontSize: 10.5, fontWeight: '700', color: palette.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
-                  By type · days
-                </Text>
-                {Object.entries(m.leave.by_type ?? {}).filter(([, d]) => Number(d) > 0).length === 0 ? (
-                  <Text style={{ fontSize: 11.5, color: palette.muted }}>No leave taken in this period.</Text>
-                ) : (
-                  Object.entries(m.leave.by_type ?? {})
-                    .filter(([, d]) => Number(d) > 0)
-                    .sort((a, b) => Number(b[1]) - Number(a[1]))
-                    .map(([leaveType, days]) => <DetailRow key={leaveType} label={leaveType} value={Number(days).toLocaleString()} />)
-                )}
+            <GlassPanel title="Leave" hint="By type, this period · days" style={s.panelItem}>
+              <DonutChart
+                centerValue={m.leave.total_days.value.toLocaleString()}
+                centerLabel="total days"
+                segments={Object.entries(m.leave.by_type ?? {})
+                  .filter(([, d]) => Number(d) > 0)
+                  .sort((a, b) => Number(b[1]) - Number(a[1]))
+                  .map(([leaveType, days], i) => ({
+                    label: leaveType,
+                    value: Number(days),
+                    color: LEAVE_COLORS[i % LEAVE_COLORS.length](palette),
+                  }))}
+              />
+              <View style={{ marginTop: 14, borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 12, gap: 6 }}>
+                <DetailRow label="Paid days" value={m.leave.paid_days.value.toLocaleString()} />
+                <DetailRow label="Unpaid days" value={m.leave.unpaid_days.value.toLocaleString()} />
               </View>
             </GlassPanel>
           </View>

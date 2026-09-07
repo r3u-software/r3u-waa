@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TextStyle, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, Line, LinearGradient, Polygon, Polyline, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, Line, LinearGradient, Path, Polygon, Polyline, Stop } from 'react-native-svg';
 import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useWebTheme, webOnlyStyle, WEB_THEMES, WebModePref, WebPalette } from './webTheme';
@@ -234,6 +234,184 @@ export function AreaChart({
       <Polyline points={linePoints} fill="none" stroke={palette.accent} strokeWidth={2.5} />
       <Circle cx={last.x} cy={last.y} r={4.5} fill={palette.accent2} />
     </Svg>
+  );
+}
+
+/**
+ * nexus's `donut()` — a multi-segment ring built from stroke-dasharray
+ * offsets on stacked `<Circle>`s (portable to native, unlike the
+ * reference's own `conic-gradient` CSS trick, which react-native-svg has no
+ * equivalent for), a centered value/label, and a legend list with a color
+ * swatch + value per row. Segments with 0 value are skipped so an empty
+ * category doesn't draw a zero-length arc.
+ */
+export function DonutChart({
+  segments,
+  centerValue,
+  centerLabel,
+  size = 132,
+}: {
+  segments: { label: string; value: number; color: string; display?: string }[];
+  centerValue: string;
+  centerLabel: string;
+  size?: number;
+}) {
+  const { palette } = useWebTheme();
+  const live = segments.filter((s) => s.value > 0);
+  const total = live.reduce((sum, s) => sum + s.value, 0);
+  const r = size / 2 - 9;
+  const c = 2 * Math.PI * r;
+  let acc = 0;
+
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 20, alignItems: 'center' }}>
+      <View style={{ width: size, height: size }}>
+        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <Circle cx={size / 2} cy={size / 2} r={r} stroke={palette.hover} strokeWidth={9} fill="none" />
+          {total > 0
+            ? live.map((s, i) => {
+                const frac = s.value / total;
+                const dash = frac * c;
+                const offset = c - (acc / total) * c;
+                acc += s.value;
+                return (
+                  <Circle
+                    key={i}
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    stroke={s.color}
+                    strokeWidth={9}
+                    fill="none"
+                    strokeDasharray={`${dash} ${c - dash}`}
+                    strokeDashoffset={offset}
+                    strokeLinecap={live.length > 1 ? 'butt' : 'round'}
+                    // Start at 12 o'clock, like nexus's conic-gradient does —
+                    // an untransformed SVG circle's stroke starts at 3 o'clock.
+                    // A 'transform' string, not the rotation+origin prop
+                    // pair: react-native-svg's web shim emits those two as a
+                    // raw 'transform-origin' DOM attribute, which React
+                    // logs as an invalid-property error (harmless visually,
+                    // but real console noise on every render).
+                    transform={`rotate(-90 ${size / 2} ${size / 2})`}
+                  />
+                );
+              })
+            : null}
+        </Svg>
+        <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={{ fontFamily: DISPLAY.extrabold, fontSize: 20, color: palette.text }}>{centerValue}</Text>
+          <Text style={[T.microLabel, { color: palette.muted, marginTop: 1 }]}>{centerLabel}</Text>
+        </View>
+      </View>
+      <View style={{ flex: 1, minWidth: 140, gap: 8 }}>
+        {live.length === 0 ? (
+          <Text style={[T.bodySm, { color: palette.muted }]}>Nothing to show for this period.</Text>
+        ) : (
+          live.map((s, i) => (
+            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: s.color }} />
+              <Text style={[T.bodySm, { color: palette.text, flex: 1 }]} numberOfLines={1}>{s.label}</Text>
+              <Text style={[T.figureStrong, { color: palette.text }]}>{s.display ?? s.value}</Text>
+            </View>
+          ))
+        )}
+      </View>
+    </View>
+  );
+}
+
+/** nexus's `ringChart()` — a single-value gauge (e.g. an absence or
+ * attendance rate), same stroke-dasharray technique as `DonutChart` but one
+ * segment against its own track. */
+export function RingChart({
+  pct,
+  label,
+  value,
+  size = 120,
+  color,
+}: {
+  /** 0–100. Values outside that range are clamped so a bad input can't draw
+   * an arc that overshoots or reverses around the ring. */
+  pct: number;
+  label: string;
+  value?: string;
+  size?: number;
+  color?: string;
+}) {
+  const { palette } = useWebTheme();
+  const clamped = Math.max(0, Math.min(100, pct));
+  const r = size / 2 - 9;
+  const c = 2 * Math.PI * r;
+  const tone = color ?? palette.accent2;
+  return (
+    <View style={{ width: size, height: size, alignSelf: 'center' }}>
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke={palette.hover} strokeWidth={9} fill="none" />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={tone}
+          strokeWidth={9}
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={`${c} ${c}`}
+          strokeDashoffset={c * (1 - clamped / 100)}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+        <Text style={{ fontFamily: DISPLAY.extrabold, fontSize: 22, color: palette.text }}>{value ?? `${clamped}%`}</Text>
+        <Text style={[T.microLabel, { color: palette.muted, marginTop: 1 }]}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
+/** nexus's `barChart()` — vertical bars against a shared baseline, each
+ * carrying a short axis label underneath. Used where a set of categorical
+ * totals (not a time series — this app's analytics function has no rolling
+ * series to draw, only current-vs-previous single points, see the "Web
+ * dashboard redesign" note in CLAUDE.md on why sparklines were dropped
+ * rather than faked) reads better as bars than a donut. */
+export function MiniBarChart({
+  bars,
+  height = 120,
+}: {
+  bars: { label: string; value: number; color?: string; display?: string }[];
+  height?: number;
+}) {
+  const { palette } = useWebTheme();
+  const max = Math.max(...bars.map((b) => b.value), 1);
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height, paddingTop: 8 }}>
+        {bars.map((b, i) => (
+          <View key={i} style={{ flex: 1, alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+            <Text style={[T.figureStrong, { color: palette.text, marginBottom: 4, fontSize: 10.5 }]}>
+              {b.display ?? b.value}
+            </Text>
+            <View
+              style={{
+                width: '100%',
+                maxWidth: 40,
+                height: `${Math.max(3, (b.value / max) * 100)}%`,
+                borderRadius: 7,
+                backgroundColor: b.color ?? palette.accent2,
+              }}
+            />
+          </View>
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 7 }}>
+        {bars.map((b, i) => (
+          <Text key={i} style={{ flex: 1, textAlign: 'center', fontSize: 9.5, color: palette.muted2, fontFamily: BODY.semibold }} numberOfLines={1}>
+            {b.label}
+          </Text>
+        ))}
+      </View>
+    </View>
   );
 }
 
