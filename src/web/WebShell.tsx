@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import { useSession } from '../lib/session';
@@ -103,6 +103,8 @@ export function WebShell({
   const { palette } = useWebTheme();
   const [themePanelOpen, setThemePanelOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const themeAnchorRef = useRef<View>(null);
+  const userAnchorRef = useRef<View>(null);
 
   const isPlatformOwner = role === 'platform_owner';
   const groups = isPlatformOwner ? PLATFORM_OWNER_NAV : HR_NAV;
@@ -114,6 +116,35 @@ export function WebShell({
     setUserMenuOpen(false);
   }
 
+  /**
+   * Click-outside-to-close, take two. The first attempt used RN's
+   * `onStartShouldSetResponder` on the shell root, which fired on every
+   * touch anywhere — including a touch landing on "Sign out" itself. Since
+   * that handler ran on touch-start and closed the menu synchronously,
+   * React unmounted the Sign-out Pressable before the browser's matching
+   * touch-end (the click) could land on it — a click needs the same element
+   * present at both ends of the gesture, so the menu just closed and Sign
+   * out silently did nothing. ("even sign out cant sign out" — this is why.)
+   *
+   * This runs only while a popover is actually open, listens for the real
+   * DOM `mousedown` (this shell is web-only, so a native listener is the
+   * right tool here, not RN's cross-platform responder system), and closes
+   * only when the click lands outside *both* anchor subtrees — a click on
+   * the trigger or on anything inside the open panel (Sign out included)
+   * passes through untouched and reaches its own onPress normally.
+   */
+  useEffect(() => {
+    if (!themePanelOpen && !userMenuOpen) return;
+    function onDocMouseDown(e: MouseEvent) {
+      const target = e.target as Node;
+      const insideTheme = themeAnchorRef.current && (themeAnchorRef.current as unknown as Node).contains?.(target);
+      const insideUser = userAnchorRef.current && (userAnchorRef.current as unknown as Node).contains?.(target);
+      if (!insideTheme && !insideUser) closePopovers();
+    }
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
+  }, [themePanelOpen, userMenuOpen]);
+
   return (
     <View
       style={[
@@ -124,28 +155,7 @@ export function WebShell({
         }),
       ]}
     >
-      <View
-        style={s.shell}
-        // Click-outside-to-close, without a full-screen overlay Pressable:
-        // `topbar` and `sidebar` both set `backdropFilter`, which — like
-        // `filter`/`opacity<1`/`transform` — establishes its own CSS
-        // stacking context. An overlay `zIndex` can never out-rank content
-        // trapped inside a descendant's own stacking context regardless of
-        // how high the number is, so a real overlay here would need to sit
-        // *inside* every such context to work, which defeats the point of
-        // one shared catch-all. `onStartShouldSetResponder` sidesteps this
-        // entirely: it fires on every touch that starts anywhere in this
-        // subtree (same non-capturing technique `_layout.tsx` uses for idle-
-        // activity tracking), and returning `false` lets the touch continue
-        // on to whatever Pressable is actually under it — so a tap on the
-        // Appearance/Account buttons still closes popovers first, then
-        // immediately reopens the one that was tapped, once its own onPress
-        // fires on release.
-        onStartShouldSetResponder={() => {
-          if (themePanelOpen || userMenuOpen) closePopovers();
-          return false;
-        }}
-      >
+      <View style={s.shell}>
         <View
           style={[
             s.sidebar,
@@ -236,7 +246,7 @@ export function WebShell({
 
             {actions}
 
-            <View style={s.popoverAnchor}>
+            <View style={s.popoverAnchor} ref={themeAnchorRef}>
               <Pressable
                 onPress={() => {
                   setUserMenuOpen(false);
@@ -265,7 +275,7 @@ export function WebShell({
               ) : null}
             </View>
 
-            <View style={s.popoverAnchor}>
+            <View style={s.popoverAnchor} ref={userAnchorRef}>
               <Pressable
                 onPress={() => {
                   setThemePanelOpen(false);
