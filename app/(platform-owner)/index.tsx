@@ -22,6 +22,7 @@ import { colors, fonts, radius, spacing, type } from '../../src/theme';
 import { WebShell } from '../../src/web/WebShell';
 import { useWebTheme } from '../../src/web/webTheme';
 import { GlassButton, GlassOutlineButton, WebPageHeader, WebSection } from '../../src/web/webUi';
+import { DISPLAY } from '../../src/web/nexusType';
 
 /**
  * Platform Owner home — three actions, one page.
@@ -481,10 +482,10 @@ function CredentialsModal({
   return (
     <Modal visible={!!issued} transparent animationType="fade" onRequestClose={onDismiss}>
       <View style={s.backdrop}>
-        <View style={s.sheet}>
+        <View style={[s.sheet, { backgroundColor: palette.panelSolid }]}>
           <ScrollView contentContainerStyle={{ padding: spacing.xl }}>
-            <Text style={s.sheetTitle}>{issued?.heading}</Text>
-            <Text style={s.sheetSub}>{issued?.context}</Text>
+            <Text style={[s.sheetTitle, { color: palette.text }]}>{issued?.heading}</Text>
+            <Text style={[s.sheetSub, { color: palette.muted }]}>{issued?.context}</Text>
 
             <View style={credBoxStyle}>
               <Text style={[s.credLabel, { color: palette.muted }]}>HR/ADMIN LOGIN ID</Text>
@@ -499,14 +500,14 @@ function CredentialsModal({
               </Text>
             </View>
 
-            <View style={s.warnBox}>
-              <Text style={s.warnText}>
+            <View style={[s.warnBox, { backgroundColor: palette.warnBg }]}>
+              <Text style={[s.warnText, { color: palette.warn }]}>
                 Copy these down now. This is the only time they will be shown — there is no way to
                 read them back, and the only recovery is issuing a fresh temporary password.
               </Text>
             </View>
 
-            <Text style={s.tip}>
+            <Text style={[s.tip, { color: palette.muted }]}>
               The HR/Admin signs in with the login ID above (not an email address), is forced to
               set their own password, then fills in their profile.
             </Text>
@@ -550,7 +551,7 @@ const s = StyleSheet.create({
   },
   adminEmpty: { fontSize: 12, color: colors.muted, fontFamily: fonts.body },
   adminRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  adminCode: { fontSize: 14, fontFamily: fonts.bodyBold, color: colors.ink, letterSpacing: 0.5 },
+  adminCode: { fontSize: 14, fontFamily: fonts.bodyBold, letterSpacing: 0.5 },
   adminName: { fontSize: 11.5, color: colors.muted, marginTop: 2, fontFamily: fonts.body },
   adminBtn: { paddingHorizontal: 16, paddingVertical: 9 },
 
@@ -573,11 +574,16 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.xl,
   },
-  sheet: { backgroundColor: colors.paper, borderRadius: 20, maxHeight: '85%' },
-  sheetTitle: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '700', color: colors.ink },
+  // Real R3U-WAA glass sheet (2026-09-07) — this was a literal
+  // `colors.paper` white popup with `fonts.serif` headings sitting on top
+  // of the otherwise-dark glass dashboard, the most visually jarring paper
+  // leftover on this page. Layout-only here now; color comes from the
+  // `palette` overrides at each JSX call site above, same pattern
+  // `credBoxStyle` (built inline, a few lines up) already used.
+  sheet: { borderRadius: 20, maxHeight: '85%' },
+  sheetTitle: { fontFamily: DISPLAY.bold, fontSize: 22 },
   sheetSub: {
     fontSize: 12.5,
-    color: colors.muted,
     lineHeight: 18,
     marginTop: 4,
     marginBottom: spacing.lg,
@@ -592,11 +598,10 @@ const s = StyleSheet.create({
   },
   credValue: { fontSize: 17, fontFamily: fonts.bodySemi, letterSpacing: 1 },
   warnBox: {
-    backgroundColor: colors.warnBg,
     borderRadius: radius.lg,
     padding: 12,
     marginTop: 4,
   },
-  warnText: { color: colors.warn, fontSize: 12.5, lineHeight: 18, fontFamily: fonts.bodySemi },
-  tip: { fontSize: 11.5, color: colors.muted, lineHeight: 17, marginTop: 10, fontFamily: fonts.body },
+  warnText: { fontSize: 12.5, lineHeight: 18, fontFamily: fonts.bodySemi },
+  tip: { fontSize: 11.5, lineHeight: 17, marginTop: 10, fontFamily: fonts.body },
 });

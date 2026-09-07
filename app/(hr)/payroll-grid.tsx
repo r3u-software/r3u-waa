@@ -1,18 +1,18 @@
 /*
- * Not yet in the web nav — HR-DASHBOARD-RELOCATION-PROPOSAL.md, Stage A.
- *
  * The HR/Admin payroll grid — was `(hr)/(tabs)/index.tsx`, the Payroll tab,
  * before HR-ADMIN-MOBILE-ACCESS-ADDENDUM.md narrowed HR/Admin's mobile
  * surface. This screen belongs to the full HR/Admin surface, which lives on
- * the web dashboard.
+ * the web dashboard, in `WebShell`'s nav under "payroll-grid" (linked since
+ * HR-DASHBOARD-RELOCATION-PROPOSAL.md's Stage A — Stage C turned out already
+ * satisfied by that same pass, see CLAUDE.md's "HR full-dashboard Stages
+ * B-D"; this file's own header comment saying otherwise was simply never
+ * updated after the fact).
  *
- * Its data layer is fixed as of this phase: run/payslip reads and writes
- * (status advancement, mark-paid, proof attachment) now go through
- * `waa-hr-payroll-grid` (company-scoped edge function). The leave-overlap
- * flag per worker keeps its own separately-fixed path — see
+ * Its data layer: run/payslip reads and writes (status advancement,
+ * mark-paid, proof attachment) go through `waa-hr-payroll-grid`
+ * (company-scoped edge function). The leave-overlap flag per worker keeps
+ * its own separately-fixed path — see
  * `waa_worker_has_leave_overlap_for_caller` in CLAUDE.md — unchanged here.
- * The screen itself is unchanged and will render real data the moment it's
- * linked from somewhere (Stage C of the same proposal).
  */
 import React, { useMemo, useState } from 'react';
 import {
@@ -50,13 +50,13 @@ import {
   ErrorNote,
   Loader,
   Pill,
-  StatusStrip,
 } from '../../src/components/ui';
 import { colors, fonts, radius, spacing, toneForStatus, type } from '../../src/theme';
 import { cutoffFor, hours, periodLabel, peso, toDateColumn } from '../../src/lib/format';
 import { WebShell } from '../../src/web/WebShell';
 import { useWebTheme, webOnlyStyle } from '../../src/web/webTheme';
-import { Chip, GlassButton, GlassOutlineButton, WebPageHeader, WebPill, WebSection } from '../../src/web/webUi';
+import { Chip, GlassButton, GlassOutlineButton, MetricCard, WebPageHeader, WebPill, WebSection } from '../../src/web/webUi';
+import { CheckIcon, PayslipIcon, XIcon } from '../../src/components/icons';
 
 /** The lifecycle, in order. `paid` is handled separately — it needs proofs first. */
 const NEXT_STATUS: Record<PayrollRunStatus, PayrollRunStatus | null> = {
@@ -394,17 +394,32 @@ export default function HrPayroll() {
                   ) : null}
                 </Card>
 
-                <StatusStrip
-                  chips={[
-                    { value: data!.payslips.length, label: 'Payslips', tone: 'ok' },
-                    {
-                      value: data!.payslips.filter((p) => p.proof_url).length,
-                      label: 'Proof attached',
-                      tone: 'pending',
-                    },
-                    { value: missingProof.length, label: 'Missing proof', tone: 'warn' },
-                  ]}
-                />
+                <View style={s.statGrid}>
+                  <MetricCard
+                    style={s.statItem}
+                    icon={<PayslipIcon color={palette.info} size={17} />}
+                    iconBg={palette.infoBg}
+                    label="Payslips"
+                    value={data!.payslips.length.toLocaleString()}
+                    trendPct={null}
+                  />
+                  <MetricCard
+                    style={s.statItem}
+                    icon={<CheckIcon color={palette.good} size={17} />}
+                    iconBg={palette.goodBg}
+                    label="Proof attached"
+                    value={data!.payslips.filter((p) => p.proof_url).length.toLocaleString()}
+                    trendPct={null}
+                  />
+                  <MetricCard
+                    style={s.statItem}
+                    icon={<XIcon color={missingProof.length > 0 ? palette.bad : palette.muted} size={17} />}
+                    iconBg={missingProof.length > 0 ? palette.badBg : palette.hover}
+                    label="Missing proof"
+                    value={missingProof.length.toLocaleString()}
+                    trendPct={null}
+                  />
+                </View>
 
                 {/* ------------------------ The grid --------------------- */}
                 {data!.payslips.length === 0 ? (
@@ -744,6 +759,8 @@ function DateBox({ label, value, onPress }: { label: string; value: Date; onPres
 }
 
 const s = StyleSheet.create({
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginBottom: 18 },
+  statItem: { flexGrow: 1, flexBasis: 180, minWidth: 160 },
   actionRow: { flexDirection: 'row', gap: 9, marginBottom: 15, flexWrap: 'wrap', alignItems: 'center' },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
 

@@ -19,15 +19,17 @@ import { router } from 'expo-router';
 import { useHrAdmin } from '../../src/lib/session';
 import { useAsync } from '../../src/lib/useAsync';
 import { fetchAllWorkers, fetchProjects, fetchSupervisors } from '../../src/lib/queries';
-import { EmptyState, Loader, StatusStrip } from '../../src/components/ui';
+import { EmptyState, Loader } from '../../src/components/ui';
 import { toneForStatus } from '../../src/theme';
 import { WebShell } from '../../src/web/WebShell';
 import { useWebTheme } from '../../src/web/webTheme';
+import { DoorExitIcon, TeamIcon, UserIcon } from '../../src/components/icons';
 import {
   Chip,
   DataRow,
   DataTable,
   GlassButton,
+  MetricCard,
   WebPageHeader,
   WebPill,
   WebSection,
@@ -91,13 +93,32 @@ export default function HrRoster() {
     <WebShell active="roster" title="Roster" subtitle={`Across ${data?.projects.length ?? 0} site${(data?.projects.length ?? 0) === 1 ? '' : 's'}`}>
       <WebPageHeader eyebrow="Workforce" title="Everyone" sub="Every worker, grouped by the supervisor they report to." />
 
-      <StatusStrip
-        chips={[
-          { value: active, label: 'Active workers', tone: 'ok' },
-          { value: supervisorCount, label: 'Supervisors', tone: 'pending' },
-          { value: separated, label: 'Separated', tone: 'warn' },
-        ]}
-      />
+      <View style={s.statGrid}>
+        <MetricCard
+          style={s.statItem}
+          icon={<TeamIcon color={palette.good} size={17} />}
+          iconBg={palette.goodBg}
+          label="Active workers"
+          value={active.toLocaleString()}
+          trendPct={null}
+        />
+        <MetricCard
+          style={s.statItem}
+          icon={<UserIcon color={palette.info} size={17} />}
+          iconBg={palette.infoBg}
+          label="Supervisors"
+          value={supervisorCount.toLocaleString()}
+          trendPct={null}
+        />
+        <MetricCard
+          style={s.statItem}
+          icon={<DoorExitIcon color={palette.warn} size={17} />}
+          iconBg={palette.warnBg}
+          label="Separated"
+          value={separated.toLocaleString()}
+          trendPct={null}
+        />
+      </View>
 
       <GlassButton
         label="＋ Register a supervisor"
@@ -170,5 +191,7 @@ export default function HrRoster() {
 }
 
 const s = StyleSheet.create({
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginBottom: 18 },
+  statItem: { flexGrow: 1, flexBasis: 180, minWidth: 160 },
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 18, flexWrap: 'wrap' },
 });

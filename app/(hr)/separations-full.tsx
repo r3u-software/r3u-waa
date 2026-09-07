@@ -1,18 +1,25 @@
 /*
- * Not yet in the web nav — HR-DASHBOARD-RELOCATION-PROPOSAL.md, Stage A.
- *
  * The full separation-case view — was `(hr)/(tabs)/separations.tsx`, the
  * Separations tab. Replaced on mobile by `(tabs)/separations.tsx`, which
  * reads the same context through `waa-hr-mobile-separations` and adds the
  * decision note the addendum asks for.
  *
- * Its data layer is fixed as of this phase — no dedicated function was
- * built for this screen; it composes the same three functions built for
- * the other screens (`waa-hr-roster`'s list actions, `waa-hr-payroll-grid`'s
- * list actions, and `waa-hr-mobile-cash-advances`'s `list_all`) rather than
- * duplicating identical company-scoped queries in a fourth. The screen
- * itself is unchanged and will render real data the moment it's linked from
- * somewhere (Stage C of the same proposal).
+ * Its data layer: no dedicated function was built for this screen; it
+ * composes the same three functions built for the other screens
+ * (`waa-hr-roster`'s list actions, `waa-hr-payroll-grid`'s list actions, and
+ * `waa-hr-mobile-cash-advances`'s `list_all`) rather than duplicating
+ * identical company-scoped queries in a fourth. Linked in `WebShell`'s nav
+ * under "separations-full" since HR-DASHBOARD-RELOCATION-PROPOSAL.md's
+ * Stage A (this file's header previously claimed otherwise — stale, fixed
+ * 2026-09-07, see the same correction on payroll-grid.tsx).
+ *
+ * Reskinned onto the glass system 2026-09-07 — this was the one screen the
+ * "Actual data tables, not white cards on a dark canvas" pass (CLAUDE.md)
+ * never actually reached despite the rest of the dashboard having been
+ * converted: each case still rendered inside `ui.tsx`'s `Card`, with
+ * `colors.paper`/`colors.ink`/`colors.steel` hardcoded throughout its own
+ * style sheet — a paper-white card sitting directly on the dark glass
+ * canvas. All fetch/derive logic below is unchanged.
  */
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -27,11 +34,21 @@ import {
   fetchSupervisors,
 } from '../../src/lib/queries';
 import type { WaaPayslip } from '../../src/lib/types';
-import { Card, EmptyState, Loader, Pill, StatusStrip } from '../../src/components/ui';
-import { colors, fonts, radius, toneForStatus, type } from '../../src/theme';
+import { EmptyState, Loader } from '../../src/components/ui';
+import { toneForStatus } from '../../src/theme';
 import { initialsOf, periodLabel, peso, relativeStamp } from '../../src/lib/format';
 import { WebShell } from '../../src/web/WebShell';
-import { WebPageHeader, WebSection } from '../../src/web/webUi';
+import { useWebTheme } from '../../src/web/webTheme';
+import { DoorExitIcon, WalletIcon } from '../../src/components/icons';
+import {
+  GlassCard,
+  MetricCard,
+  WebPageHeader,
+  WebPill,
+  WebSection,
+  webToneFor,
+} from '../../src/web/webUi';
+import { BODY, T } from '../../src/web/nexusType';
 
 /**
  * Separation inbox.
@@ -47,6 +64,7 @@ import { WebPageHeader, WebSection } from '../../src/web/webUi';
  */
 export default function HrSeparations() {
   const hrAdmin = useHrAdmin();
+  const { palette } = useWebTheme();
 
   const { data, loading, reload } = useAsync(async () => {
     const [workers, runs, advances, supervisors] = await Promise.all([
@@ -102,13 +120,32 @@ export default function HrSeparations() {
     <WebShell active="separations-full" title="Separations" subtitle="Tagged by a supervisor · pay outcome is your call">
       <WebPageHeader eyebrow="System" title="Separation cases" sub="Tagged by a supervisor · pay outcome is your call." />
 
-      <StatusStrip
-          chips={[
-            { value: cases.length, label: 'Separated', tone: 'warn' },
-            { value: withPending, label: 'With pending pay', tone: 'pending' },
-            { value: cases.length - withPending, label: 'Nothing pending', tone: 'ok' },
-          ]}
+      <View style={s.statGrid}>
+        <MetricCard
+          style={s.statItem}
+          icon={<DoorExitIcon color={palette.warn} size={17} />}
+          iconBg={palette.warnBg}
+          label="Separated"
+          value={cases.length.toLocaleString()}
+          trendPct={null}
         />
+        <MetricCard
+          style={s.statItem}
+          icon={<WalletIcon color={palette.info} size={17} />}
+          iconBg={palette.infoBg}
+          label="With pending pay"
+          value={withPending.toLocaleString()}
+          trendPct={null}
+        />
+        <MetricCard
+          style={s.statItem}
+          icon={<DoorExitIcon color={palette.good} size={17} />}
+          iconBg={palette.goodBg}
+          label="Nothing pending"
+          value={(cases.length - withPending).toLocaleString()}
+          trendPct={null}
+        />
+      </View>
 
         {loading && !data ? (
           <Loader label="Gathering cases" />
@@ -120,40 +157,42 @@ export default function HrSeparations() {
         ) : (
           <WebSection title="Cases">
             {cases.map((c) => (
-              <Card key={c.worker.id}>
+              <GlassCard key={c.worker.id} style={{ marginBottom: 12 }}>
                 <Pressable
                   onPress={() => router.push(`/(hr)/worker/${c.worker.id}`)}
                   style={({ pressed }) => [s.head, pressed && { opacity: 0.7 }]}
                 >
-                  <View style={s.avatar}>
-                    <Text style={s.initials}>{initialsOf(c.worker.full_name)}</Text>
+                  <View style={[s.avatar, { backgroundColor: palette.hover, borderColor: palette.border }]}>
+                    <Text style={{ fontSize: 12, fontFamily: BODY.bold, color: palette.text }}>
+                      {initialsOf(c.worker.full_name)}
+                    </Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={type.cardTitle}>{c.worker.full_name}</Text>
-                    <Text style={type.cardSub}>
+                    <Text style={[T.cardTitle, { color: palette.text }]}>{c.worker.full_name}</Text>
+                    <Text style={[T.bodySm, { color: palette.muted, marginTop: 2 }]}>
                       {c.worker.position || 'No position'} ·{' '}
                       {c.worker.employment_status_set_by
                         ? (supervisorName.get(c.worker.employment_status_set_by) ??
                           `supervisor ${c.worker.employment_status_set_by.slice(0, 8)}`)
                         : 'unknown supervisor'}
                     </Text>
-                    <Text style={s.stamp}>
+                    <Text style={[T.bodySm, { color: palette.muted2, marginTop: 3 }]}>
                       Tagged{' '}
                       {c.worker.employment_status_set_at
                         ? relativeStamp(c.worker.employment_status_set_at)
                         : 'at an unrecorded time'}
                     </Text>
                   </View>
-                  <Pill
+                  <WebPill
                     label={c.worker.employment_status}
-                    tone={toneForStatus(c.worker.employment_status)}
+                    tone={webToneFor(toneForStatus(c.worker.employment_status))}
                   />
                 </Pressable>
 
-                <View style={s.rule} />
+                <View style={[s.rule, { backgroundColor: palette.border }]} />
 
                 {c.slips.length === 0 && c.advances.length === 0 ? (
-                  <Text style={s.clean}>
+                  <Text style={[T.bodySm, { color: palette.good, lineHeight: 17, fontFamily: BODY.semibold }]}>
                     No unfinalized payslips and no outstanding cash advances. Nothing to decide.
                   </Text>
                 ) : (
@@ -161,33 +200,35 @@ export default function HrSeparations() {
                     {c.slips.map((sl) => (
                       <View key={sl.id} style={s.pendingRow}>
                         <View style={{ flex: 1 }}>
-                          <Text style={s.pendingTitle}>Payslip · {sl.runLabel}</Text>
-                          <Text style={s.pendingSub}>Run is {sl.runStatus}</Text>
+                          <Text style={[T.bodySm, { fontFamily: BODY.semibold, color: palette.text, fontSize: 12.5 }]}>
+                            Payslip · {sl.runLabel}
+                          </Text>
+                          <Text style={[T.bodySm, { color: palette.muted, marginTop: 1 }]}>Run is {sl.runStatus}</Text>
                         </View>
-                        <Text style={s.pendingAmount}>{peso(sl.net_pay)}</Text>
+                        <Text style={[T.figureStrong, { color: palette.text, fontSize: 13 }]}>{peso(sl.net_pay)}</Text>
                       </View>
                     ))}
                     {c.advances.map((a) => (
                       <View key={a.id} style={s.pendingRow}>
                         <View style={{ flex: 1 }}>
-                          <Text style={s.pendingTitle}>
+                          <Text style={[T.bodySm, { fontFamily: BODY.semibold, color: palette.text, fontSize: 12.5 }]}>
                             Cash advance · {a.status.replace('_', ' ')}
                           </Text>
-                          <Text style={s.pendingSub}>{a.reason || 'No reason given'}</Text>
+                          <Text style={[T.bodySm, { color: palette.muted, marginTop: 1 }]}>{a.reason || 'No reason given'}</Text>
                         </View>
-                        <Text style={s.pendingAmount}>
+                        <Text style={[T.figureStrong, { color: palette.text, fontSize: 13 }]}>
                           {a.money ? peso(a.money.amount) : '—'}
                         </Text>
                       </View>
                     ))}
-                    <Text style={s.judgement}>
+                    <Text style={[T.bodySm, { color: palette.warn, lineHeight: 17, marginTop: 10 }]}>
                       Unpaid net {peso(c.owed)} · unsettled advances {peso(c.advanceTotal)}. Decide
                       by hand what happens to these — nothing here forfeits or releases anything
                       automatically.
                     </Text>
                   </>
                 )}
-              </Card>
+              </GlassCard>
             ))}
           </WebSection>
         )}
@@ -196,30 +237,17 @@ export default function HrSeparations() {
 }
 
 const s = StyleSheet.create({
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginBottom: 18 },
+  statItem: { flexGrow: 1, flexBasis: 180, minWidth: 160 },
   head: { flexDirection: 'row', gap: 11, alignItems: 'flex-start' },
   avatar: {
     width: 38,
     height: 38,
-    borderRadius: radius.md,
-    backgroundColor: colors.paper,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initials: { fontSize: 12, fontFamily: fonts.bodyBold, color: colors.steel },
-  stamp: { fontSize: 11, color: colors.muted, marginTop: 3, fontFamily: fonts.body },
-  rule: { height: 1, backgroundColor: colors.line, marginVertical: 12 },
-  clean: { fontSize: 11.5, color: colors.ok, lineHeight: 17, fontFamily: fonts.bodySemi },
+  rule: { height: 1, marginVertical: 12 },
   pendingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
-  pendingTitle: { fontSize: 12.5, fontFamily: fonts.bodySemi, color: colors.ink },
-  pendingSub: { fontSize: 10.5, color: colors.muted, marginTop: 1, fontFamily: fonts.body },
-  pendingAmount: { fontSize: 13, fontFamily: fonts.bodyBold, color: colors.ink },
-  judgement: {
-    fontSize: 11.5,
-    color: colors.safetyDeep,
-    lineHeight: 17,
-    marginTop: 10,
-    fontFamily: fonts.body,
-  },
 });
