@@ -4,8 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Polygon, Polyline, Stop } from 'react-native-svg';
 import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { useWebTheme, webOnlyStyle, WEB_THEMES, WebModePref, WebPalette } from './webTheme';
-import { MonitorIcon, MoonIcon, SunIcon } from '../components/icons';
+import { useWebTheme, webOnlyStyle, WEB_THEMES, WebPalette } from './webTheme';
+import { CheckIcon } from '../components/icons';
 import { initialsOf } from '../lib/format';
 import { SignedImage } from '../components/SignedImage';
 import type { WaaBucket } from '../lib/types';
@@ -827,68 +827,52 @@ export function AuthShell({
   );
 }
 
-/** Light / Dark / System, one pill with three segments — the platform-wide
- * appearance control BRAND-SYSTEM.md's Global experience list calls for.
- * `compact` (icons only, no label) is what fits the web dashboard's top bar;
- * the full labeled form is what the native Worker/Supervisor Profile screens
- * use in their "Appearance" section, since there's no top bar there to put
- * it in. Either way it edits the same `modePref` in `useWebTheme()`, so a
- * choice made on one surface is the choice read back on every other. */
-export function ModeSwitcher({ compact = false }: { compact?: boolean }) {
-  const { modePref, setModePref, palette } = useWebTheme();
-  const options: { id: WebModePref; label: string; Icon: typeof SunIcon }[] = [
-    { id: 'light', label: 'Light', Icon: SunIcon },
-    { id: 'dark', label: 'Dark', Icon: MoonIcon },
-    { id: 'system', label: 'System', Icon: MonitorIcon },
-  ];
-  return (
-    <View style={{ flexDirection: 'row', backgroundColor: palette.hover, borderRadius: 999, padding: 3, gap: 2 }}>
-      {options.map(({ id, label, Icon }) => {
-        const active = modePref === id;
-        return (
-          <Pressable
-            key={id}
-            onPress={() => setModePref(id)}
-            accessibilityRole="button"
-            accessibilityLabel={label}
-            accessibilityState={{ selected: active }}
-            style={({ pressed }) => [
-              {
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                paddingHorizontal: compact ? 9 : 13,
-                paddingVertical: compact ? 6 : 8,
-                borderRadius: 999,
-                backgroundColor: active ? palette.panelSolid : 'transparent',
-              },
-              pressed && !active && { opacity: 0.6 },
-            ]}
-          >
-            <Icon color={active ? palette.text : palette.muted} size={compact ? 13 : 14} />
-            {!compact ? (
-              <Text style={{ fontSize: 12, fontWeight: '600', color: active ? palette.text : palette.muted }}>
-                {label}
-              </Text>
-            ) : null}
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
-/** The ten BRAND-SYSTEM.md accent themes as tappable swatches. Real
- * `ExpoLinearGradient` per swatch rather than the `webOnlyStyle`
- * CSS-`backgroundImage` trick WebShell's original inline version used — that
- * renders nothing on native (`webOnlyStyle` returns `{}` off web), and this
- * is now shared with the native Worker/Supervisor Profile screens' own
- * Appearance section, so the swatches have to actually paint there too. */
+/**
+ * Aurora / Sunrise / Frost, as three named cards — not ten plain color
+ * dots. Picking one picks its mode too (the theme *is* light or dark, not a
+ * base you tint afterward — see `webTheme.tsx`'s header comment), so there
+ * is no separate light/dark control here at all; the old `ModeSwitcher` is
+ * gone rather than left to edit a preference nothing reads anymore.
+ *
+ * `compact` (small swatch, no label) is what fits the web dashboard's
+ * topbar theme popover; the full form (swatch + name + tagline + a check on
+ * the active one) is what the native Worker/Supervisor Profile screens use
+ * in their own "Appearance" section, matching the picker exactly as it was
+ * proposed and approved. Either way it edits the same `themeId` in
+ * `useWebTheme()`, so a choice made on one surface is the choice read back
+ * on every other.
+ */
 export function ColorThemeSwitcher({ compact = false }: { compact?: boolean }) {
   const { themeId, setThemeId, palette } = useWebTheme();
-  const size = compact ? 18 : 28;
+
+  if (compact) {
+    return (
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        {WEB_THEMES.map((t) => {
+          const on = t.id === themeId;
+          return (
+            <Pressable
+              key={t.id}
+              onPress={() => setThemeId(t.id)}
+              accessibilityRole="button"
+              accessibilityLabel={t.label}
+              accessibilityState={{ selected: on }}
+            >
+              <ExpoLinearGradient
+                colors={[t.accent, t.accent2]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ width: 22, height: 22, borderRadius: 7, borderWidth: on ? 2 : 0, borderColor: palette.text }}
+              />
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  }
+
   return (
-    <View style={{ flexDirection: 'row', flexWrap: compact ? 'nowrap' : 'wrap', gap: compact ? 7 : 11, alignItems: 'center' }}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
       {WEB_THEMES.map((t) => {
         const on = t.id === themeId;
         return (
@@ -898,24 +882,56 @@ export function ColorThemeSwitcher({ compact = false }: { compact?: boolean }) {
             accessibilityRole="button"
             accessibilityLabel={t.label}
             accessibilityState={{ selected: on }}
+            style={{
+              flex: 1,
+              // 3 cards, one row: this needs to actually fit alongside the
+              // popover's own width (`s.themePanel` in WebShell.tsx, 420px)
+              // rather than being guessed independently of it — 130 here
+              // against a 380px panel wrapped Frost onto its own row,
+              // found live rather than assumed.
+              minWidth: 112,
+              borderRadius: 14,
+              padding: 11,
+              borderWidth: 2,
+              borderColor: on ? t.accent : 'transparent',
+              backgroundColor: on ? hexAlphaLocal(t.accent, 0.08) : palette.hover,
+            }}
           >
-            <ExpoLinearGradient
-              colors={[t.accent, t.accent2]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{
-                width: size,
-                height: size,
-                borderRadius: size / 2,
-                borderWidth: on ? 2.5 : 0,
-                borderColor: palette.text,
-              }}
-            />
+            <View style={{ height: 44, borderRadius: 9, overflow: 'hidden', marginBottom: 9 }}>
+              <ExpoLinearGradient colors={[t.accent, t.accent2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1 }} />
+            </View>
+            {on ? (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                  width: 18,
+                  height: 18,
+                  borderRadius: 999,
+                  backgroundColor: t.accent,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <CheckIcon color="#fff" size={10} />
+              </View>
+            ) : null}
+            <Text style={{ fontSize: 12.5, fontWeight: '700', color: palette.text }}>{t.label}</Text>
+            <Text style={{ fontSize: 10.5, color: palette.muted, marginTop: 1 }}>{t.tagline}</Text>
           </Pressable>
         );
       })}
     </View>
   );
+}
+
+function hexAlphaLocal(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 /* --------------------------------------------------------------- Chips --- */

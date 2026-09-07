@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Slot, useRouter, useSegments } from 'expo-router';
@@ -30,23 +30,21 @@ import { resolvePalette } from '../src/web/webTheme';
  * one piece of chrome the glass pass had missed, so the very first thing
  * anyone saw still looked like the old app.
  *
- * Aurora accent, but the light/dark half now follows the phone's own
- * setting via `useColorScheme()` — a real report from testing: this stayed
- * hardcoded dark even on a phone set to light mode, defying the
- * Light/Dark/System picker the rest of the app already has. `useColorScheme`
- * is a plain RN hook (no provider needed), which is why it's used here
- * instead of `useWebTheme()` — this still renders before
- * `SafeAreaProvider`/`SessionProvider` (let alone `WebThemeProvider`) are
- * mounted, so it stays dependency-light on purpose. One real scope cut, not
- * silently dropped: an explicit Light or Dark *override* picked elsewhere
- * in the app isn't read here — only "System" is, since anything else needs
- * an AsyncStorage read before first paint, which would trade this screen's
- * instant appearance for a flash of the wrong color while that resolves.
- * The splash is on screen for well under a second in normal use, so that
- * tradeoff isn't worth it for the override case specifically. */
+ * Fixed to Aurora, deliberately — not the theme the person last picked.
+ * Three named themes (2026-09-07) replaced the old single-accent-plus-
+ * light/dark/system model this screen used to follow via `useColorScheme()`
+ * (matching a real bug report: it used to stay hardcoded dark even on a
+ * phone set to light mode). That model doesn't map onto three fully
+ * separate visual identities — there's no "the light half of whichever
+ * theme is picked" to resolve to. Reading the actual stored `themeId`
+ * instead would need an AsyncStorage read before first paint, trading this
+ * screen's instant appearance for a flash of the wrong theme while that
+ * resolves; not worth it for a screen on screen well under a second in
+ * normal use. Aurora is this app's default theme everywhere else
+ * (`DEFAULT_THEME_ID` in webTheme.tsx), so it's what a first-ever launch
+ * would show anyway before any choice has been made. */
 function Splash({ subtitle }: { subtitle?: string }) {
-  const scheme = useColorScheme();
-  const palette = resolvePalette('aurora', scheme === 'light' ? 'light' : 'dark');
+  const palette = resolvePalette('aurora');
   return (
     <View style={[s.splash, { backgroundColor: palette.bg }]}>
       <LinearGradient

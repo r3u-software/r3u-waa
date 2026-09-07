@@ -14,7 +14,6 @@ import {
   GlassCard,
   GlassOutlineButton,
   GlassScreen,
-  ModeSwitcher,
   WebSection,
 } from '../../../src/web/webUi';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,8 +23,8 @@ import { LinearGradient } from 'expo-linear-gradient';
  *
  * Reskinned to the glass system (2026-09-04) — this was the one screen the
  * "Supervisor's own screens" pass explicitly left out, only bolting glass
- * sub-components (Appearance's `ModeSwitcher`/`ColorThemeSwitcher`, and
- * briefly a biometric toggle) onto an otherwise still-paper `Card`/`Section`
+ * sub-components (Appearance's `ColorThemeSwitcher`, and briefly a
+ * biometric toggle) onto an otherwise still-paper `Card`/`Section`
  * shell underneath. All fetch logic (roster, projects, assignments,
  * incomplete-profile count) is unchanged — view layer only, same as every
  * other screen in this app's reskin history.
@@ -118,15 +117,8 @@ export default function SupervisorProfile() {
         </WebSection>
 
         <WebSection title="Appearance">
-          <GlassCard style={{ gap: 16 }}>
-            <View>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: palette.muted, marginBottom: 8 }}>MODE</Text>
-              <ModeSwitcher />
-            </View>
-            <View>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: palette.muted, marginBottom: 8 }}>COLOR THEME</Text>
-              <ColorThemeSwitcher />
-            </View>
+          <GlassCard>
+            <ColorThemeSwitcher />
           </GlassCard>
         </WebSection>
 

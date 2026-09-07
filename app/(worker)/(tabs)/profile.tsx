@@ -5,7 +5,7 @@ import { useSession, useWorker } from '../../../src/lib/session';
 import { ProfileEditor } from '../../../src/components/ProfileEditor';
 import { initialsOf } from '../../../src/lib/format';
 import { useWebTheme } from '../../../src/web/webTheme';
-import { ColorThemeSwitcher, GlassCard, GlassOutlineButton, GlassScreen, ModeSwitcher, WebSection } from '../../../src/web/webUi';
+import { ColorThemeSwitcher, GlassCard, GlassOutlineButton, GlassScreen, WebSection } from '../../../src/web/webUi';
 import { SignedImage } from '../../../src/components/SignedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -57,15 +57,8 @@ export default function WorkerProfile() {
         <ProfileEditor worker={worker} />
 
         <WebSection title="Appearance">
-          <GlassCard style={{ gap: 16 }}>
-            <View>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: palette.muted, marginBottom: 8 }}>MODE</Text>
-              <ModeSwitcher />
-            </View>
-            <View>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: palette.muted, marginBottom: 8 }}>COLOR THEME</Text>
-              <ColorThemeSwitcher />
-            </View>
+          <GlassCard>
+            <ColorThemeSwitcher />
           </GlassCard>
         </WebSection>
 

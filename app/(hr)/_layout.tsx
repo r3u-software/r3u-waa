@@ -22,14 +22,14 @@ import { resolvePalette, WebThemeProvider } from '../../src/web/webTheme';
  * sidebar chrome. `sites` is the same kind of pushed screen.
  *
  * `WebThemeProvider` wraps the whole group once here rather than per-screen:
- * every screen inside reads the same chosen theme/mode, and it never reaches
+ * every screen inside reads the same chosen theme, and it never reaches
  * Worker/Supervisor's native tabs, which sit in their own route groups
  * outside this layout. The Stack header itself uses a fixed
- * `resolvePalette('aurora','dark')` rather than `useWebTheme()` — this
- * component renders the `WebThemeProvider` itself, so its own
- * `screenOptions` can't yet read from it.
+ * `resolvePalette('aurora')` rather than `useWebTheme()` — this component
+ * renders the `WebThemeProvider` itself, so its own `screenOptions` can't
+ * yet read from it.
  */
-const P = resolvePalette('aurora', 'dark');
+const P = resolvePalette('aurora');
 
 export default function HrLayout() {
   return (

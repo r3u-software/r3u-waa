@@ -1,53 +1,51 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import { Platform, useColorScheme } from 'react-native';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
- * Web-only theme engine for the HR/Admin + Platform Owner dashboards —
- * R3U-WAA-WEB-REDESIGN.md. Everything in `src/web/` renders exclusively on
- * `Platform.OS === 'web'` (the root guard in app/_layout.tsx never lets
- * HR/Admin or Platform Owner reach native), so this is additive: it does not
- * touch `src/theme.ts`, which stays exactly as-is for the Worker/Supervisor
- * native "paper" surfaces.
+ * Web-only theme engine for the HR/Admin + Platform Owner dashboards, and
+ * (via the same `useWebTheme()` shared with Worker/Supervisor's native
+ * screens since the "Native Worker app reskin" pass) the whole app's glass
+ * surface. Everything in `src/web/` renders on every platform now, not just
+ * `Platform.OS === 'web'`; this file does not touch `src/theme.ts`, which
+ * stays exactly as-is for whatever paper-theme remnants still reference it.
  *
- * The ten named themes are `BRAND-SYSTEM.md`'s exact list — "Built-in color
- * themes... Aurora, Graphite, Ocean, Emerald, Royal Purple, Crimson,
- * Midnight, Carbon, Sapphire, Sunset". Do not add or rename entries without
- * updating that file first.
+ * Three named themes (2026-09-07), replacing the original ten-swatch-plus-
+ * separate-light/dark/system-toggle system. That system let a user combine
+ * any of ten accent pairs with any of three light/dark modes — thirty
+ * combinations, most of them never actually designed or looked at. These
+ * three are each a single, fully considered visual identity — a real
+ * background treatment, ambient glow, and glass character per theme, not
+ * just an accent-color swap over one shared light/dark pair — chosen from a
+ * twenty-direction design-exploration pass and narrowed to three finalists,
+ * per the user's own explicit pick. Picking a theme now picks its mode too:
+ * there is no separate light/dark control layered on top, because these
+ * aren't "a dark version and a light version of the same look" — Aurora is
+ * dark by identity, Sunrise and Frost are light by identity, the way a
+ * physical product finish is one thing, not a base finish plus a tint you
+ * apply after.
  */
 
 export interface WebThemeDef {
   id: string;
   label: string;
+  tagline: string;
   accent: string;
   accent2: string;
+  /** The mode this identity is built for — not independently choosable. */
+  mode: WebMode;
 }
 
 export const WEB_THEMES: WebThemeDef[] = [
-  { id: 'aurora', label: 'Aurora', accent: '#6C5CE7', accent2: '#00D9C0' },
-  { id: 'graphite', label: 'Graphite', accent: '#64748B', accent2: '#B8C1CE' },
-  { id: 'ocean', label: 'Ocean', accent: '#2F8FFF', accent2: '#00D4FF' },
-  { id: 'emerald', label: 'Emerald', accent: '#10B981', accent2: '#5CE0A8' },
-  { id: 'royalpurple', label: 'Royal purple', accent: '#7C3AED', accent2: '#C084FC' },
-  { id: 'crimson', label: 'Crimson', accent: '#E0384D', accent2: '#FF8A8A' },
-  { id: 'midnight', label: 'Midnight', accent: '#4F5BE0', accent2: '#8CA0FF' },
-  { id: 'carbon', label: 'Carbon', accent: '#787885', accent2: '#B4B4C0' },
-  { id: 'sapphire', label: 'Sapphire', accent: '#1D6FE0', accent2: '#4FC8F7' },
-  { id: 'sunset', label: 'Sunset', accent: '#F2762E', accent2: '#F5658F' },
+  { id: 'aurora', label: 'Aurora', tagline: 'Deep glass, violet → teal', accent: '#7C6FF0', accent2: '#33D9C4', mode: 'dark' },
+  { id: 'sunrise', label: 'Sunrise', tagline: 'Airy, coral → violet mesh', accent: '#FF7A59', accent2: '#8A5CF6', mode: 'light' },
+  { id: 'frost', label: 'Frost', tagline: 'Cool, ice-blue glass', accent: '#2F8FFF', accent2: '#A78BFA', mode: 'light' },
 ];
 
 const DEFAULT_THEME_ID = 'aurora';
 
-/** The resolved paint mode — always one of these two, never `'system'`. */
+/** The paint mode a theme is built for. */
 export type WebMode = 'light' | 'dark';
-
-/**
- * What the user actually picked. `'system'` means "follow the device/OS
- * setting" — BRAND-SYSTEM.md's Global experience list calls for "Dark/Light
- * Mode" as a platform-wide, user-switchable preference, and "follows the
- * phone" is the default every user expects until they override it.
- */
-export type WebModePref = 'light' | 'dark' | 'system';
 
 /** Everything a component needs to paint itself; never a raw hex literal. */
 export interface WebPalette {
@@ -67,15 +65,18 @@ export interface WebPalette {
   goodBg: string;
   bad: string;
   badBg: string;
-  /** nexus's `--warn` / `.t-warn` — amber, distinct from `bad`'s red. The
-   * original four-tone set had no amber at all, so "pending"/"needs a look"
-   * had to borrow either the red or the blue. */
+  /** nexus's `--warn` / `.t-warn` — amber, distinct from `bad`'s red. */
   warn: string;
   warnBg: string;
   info: string;
   infoBg: string;
   /** Tint of the live accent, for `.t-brand`-style pills and icon chips. */
   accentBg: string;
+  /** The CSS `background` value for the app-level ambient glow — a radial
+   * mesh of soft color blobs for the light themes, a tighter violet/teal
+   * glow for Aurora. `webOnlyStyle`d by callers same as any other CSS-only
+   * value; native ignores it. */
+  ambient: string;
 }
 
 function themeById(id: string): WebThemeDef {
@@ -91,32 +92,64 @@ function hexAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-export function resolvePalette(themeId: string, mode: WebMode): WebPalette {
-  const { accent, accent2 } = themeById(themeId);
+/**
+ * Each theme resolves fully on its own — not "pick a light/dark base, then
+ * layer an accent on top" the way the old ten-swatch system worked. Aurora,
+ * Sunrise and Frost each specify their own bg/panel/border/ambient, matching
+ * the three-direction proposal exactly (same hex values that were actually
+ * shown and picked, not re-derived).
+ */
+export function resolvePalette(themeId: string): WebPalette {
+  const t = themeById(themeId);
+  const { accent, accent2, mode } = t;
   const dark = mode === 'dark';
+
+  if (t.id === 'sunrise') {
+    return {
+      accent, accent2,
+      bg: '#FCFBFA', bg2: '#FFFFFF',
+      panel: 'rgba(255,255,255,0.72)', panelSolid: '#FFFFFF',
+      border: 'rgba(36,31,46,0.08)',
+      text: '#241F2E', muted: '#847C93', muted2: '#A79FB3',
+      hover: 'rgba(36,31,46,0.05)', rowAlt: 'rgba(36,31,46,0.03)',
+      good: '#0FA36B', goodBg: 'rgba(15,163,107,0.12)',
+      bad: '#C23B3B', badBg: 'rgba(194,59,59,0.1)',
+      warn: '#B45309', warnBg: 'rgba(180,83,9,0.1)',
+      info: '#1D6FE0', infoBg: 'rgba(29,111,224,0.1)',
+      accentBg: hexAlpha(accent2, 0.14),
+      ambient: 'radial-gradient(900px 620px at 8% -10%, rgba(255,217,184,.55), transparent 60%), radial-gradient(820px 540px at 100% 8%, rgba(217,207,255,.5), transparent 60%), radial-gradient(700px 460px at 35% 112%, rgba(199,232,255,.45), transparent 60%)',
+    };
+  }
+  if (t.id === 'frost') {
+    return {
+      accent, accent2,
+      bg: '#EEF3F8', bg2: '#F5F8FB',
+      panel: 'rgba(255,255,255,0.68)', panelSolid: '#FFFFFF',
+      border: 'rgba(27,39,51,0.08)',
+      text: '#1B2733', muted: '#7C8AA0', muted2: '#A3AFC2',
+      hover: 'rgba(27,39,51,0.05)', rowAlt: 'rgba(27,39,51,0.028)',
+      good: '#0B7DBF', goodBg: 'rgba(11,125,191,0.1)',
+      bad: '#C23B3B', badBg: 'rgba(194,59,59,0.1)',
+      warn: '#9A5B0C', warnBg: 'rgba(154,91,12,0.1)',
+      info: '#1D6FE0', infoBg: 'rgba(29,111,224,0.1)',
+      accentBg: hexAlpha(accent2, 0.14),
+      ambient: 'radial-gradient(1000px 620px at 100% -10%, rgba(167,139,250,.18), transparent 60%)',
+    };
+  }
+  // Aurora (also the fallback for an unrecognized id).
   return {
-    accent,
-    accent2,
-    bg: dark ? '#0B0E16' : '#EEF1FA',
-    bg2: dark ? '#0E1220' : '#E7EBF7',
-    panel: dark ? 'rgba(255,255,255,0.055)' : 'rgba(255,255,255,0.82)',
-    panelSolid: dark ? '#141926' : '#FFFFFF',
-    border: dark ? 'rgba(255,255,255,0.10)' : 'rgba(18,24,60,0.12)',
-    text: dark ? '#EAEEFB' : '#151A30',
-    muted: dark ? '#98A2C0' : '#5C6684',
-    muted2: dark ? '#68729A' : '#8791AC',
-    hover: dark ? 'rgba(255,255,255,0.07)' : 'rgba(20,30,90,0.05)',
-    rowAlt: dark ? 'rgba(255,255,255,0.03)' : 'rgba(20,30,90,0.028)',
-    good: dark ? '#3FC27E' : '#1F8A54',
-    goodBg: dark ? 'rgba(63,194,126,0.16)' : 'rgba(31,138,84,0.12)',
-    bad: dark ? '#FF6B6B' : '#C23B3B',
-    badBg: dark ? 'rgba(255,107,107,0.16)' : 'rgba(194,59,59,0.1)',
-    // nexus's `--warn:#fbbf24` (dark) / `#d97706` (light).
-    warn: dark ? '#FBBF24' : '#B87503',
-    warnBg: dark ? 'rgba(251,191,36,0.15)' : 'rgba(184,117,3,0.12)',
-    info: dark ? '#4FA2FF' : '#1D6FE0',
-    infoBg: dark ? 'rgba(79,162,255,0.16)' : 'rgba(29,111,224,0.1)',
-    accentBg: hexAlpha(accent2, dark ? 0.16 : 0.12),
+    accent, accent2,
+    bg: '#0A0D16', bg2: '#12101E',
+    panel: 'rgba(255,255,255,0.05)', panelSolid: '#171325',
+    border: 'rgba(255,255,255,0.09)',
+    text: '#ECEEF7', muted: '#8892B5', muted2: '#5B617F',
+    hover: 'rgba(255,255,255,0.07)', rowAlt: 'rgba(255,255,255,0.03)',
+    good: '#3FE0B5', goodBg: 'rgba(63,224,181,0.15)',
+    bad: '#FF6B6B', badBg: 'rgba(255,107,107,0.16)',
+    warn: '#FBBF71', warnBg: 'rgba(251,191,113,0.14)',
+    info: '#4FA2FF', infoBg: 'rgba(79,162,255,0.16)',
+    accentBg: hexAlpha(accent2, 0.16),
+    ambient: 'radial-gradient(1100px 560px at 6% -12%, rgba(124,111,240,.22), transparent 60%), radial-gradient(950px 520px at 106% 8%, rgba(51,217,196,.16), transparent 55%)',
   };
 }
 
@@ -134,38 +167,30 @@ export function webOnlyStyle(style: Record<string, unknown>): object {
 /**
  * `AsyncStorage` rather than `window.localStorage` directly: it already ships
  * as the Supabase session's own storage adapter (`src/lib/supabase.ts`) and
- * resolves on every platform this app runs on — a plain object store backed
- * by `localStorage` on web, and the native SQLite-backed store on iOS/
- * Android. That is what actually lets a theme choice survive on the phone,
- * not just the browser: before this, `loadStored`/`persist` only ever wrote
- * anything on `Platform.OS === 'web'`, so Worker/Supervisor's native theme
- * was silently unpersistable even once a picker existed for it.
+ * resolves on every platform this app runs on.
  */
 const STORAGE_KEY = 'r3u-waa-web-theme';
 
 interface StoredPrefs {
   themeId: string;
-  modePref: WebModePref;
 }
 
-const DEFAULT_PREFS: StoredPrefs = { themeId: DEFAULT_THEME_ID, modePref: 'system' };
+const DEFAULT_PREFS: StoredPrefs = { themeId: DEFAULT_THEME_ID };
 
 async function loadStored(): Promise<StoredPrefs> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_PREFS;
     const parsed = JSON.parse(raw);
-    const themeId = typeof parsed.themeId === 'string' ? parsed.themeId : DEFAULT_THEME_ID;
-    // Back-compat: the pre-system-mode shape only ever stored `mode:
-    // 'light'|'dark'` (web only). Treat that as the equivalent explicit pick
-    // rather than resetting everyone quietly to 'system' on upgrade.
-    const modePref: WebModePref =
-      parsed.modePref === 'light' || parsed.modePref === 'dark' || parsed.modePref === 'system'
-        ? parsed.modePref
-        : parsed.mode === 'light' || parsed.mode === 'dark'
-        ? parsed.mode
-        : 'system';
-    return { themeId, modePref };
+    // Back-compat: the old ten-swatch system stored ids like 'graphite' or
+    // 'royalpurple' that no longer exist. Anything not one of the three
+    // current ids falls back to the default rather than resolving to
+    // Aurora's palette under someone else's old, now-meaningless label.
+    const themeId =
+      typeof parsed.themeId === 'string' && WEB_THEMES.some((t) => t.id === parsed.themeId)
+        ? parsed.themeId
+        : DEFAULT_THEME_ID;
+    return { themeId };
   } catch {
     return DEFAULT_PREFS;
   }
@@ -173,25 +198,18 @@ async function loadStored(): Promise<StoredPrefs> {
 
 interface WebThemeState {
   themeId: string;
-  /** Resolved paint mode — 'system' already collapsed to light/dark. */
+  /** Derived from the selected theme's own identity — Aurora is always
+   * 'dark', Sunrise and Frost are always 'light'. Not independently set. */
   mode: WebMode;
-  /** What the user actually picked, including 'system'. Drives the 3-way UI. */
-  modePref: WebModePref;
   palette: WebPalette;
   themes: WebThemeDef[];
   setThemeId: (id: string) => void;
-  setModePref: (m: WebModePref) => void;
 }
 
 const WebThemeCtx = createContext<WebThemeState | null>(null);
 
 export function WebThemeProvider({ children }: { children: React.ReactNode }) {
-  // `useColorScheme` is the RN-standard live OS-appearance hook — it works on
-  // web too (backed by `prefers-color-scheme`), so 'system' tracks the same
-  // way on every platform without a Platform.OS branch.
-  const systemScheme = useColorScheme();
   const [themeId, setThemeIdState] = useState(DEFAULT_THEME_ID);
-  const [modePref, setModePrefState] = useState<WebModePref>('system');
 
   // AsyncStorage is inherently async (even its web shim), so the stored pick
   // arrives one tick after first paint — same brief default-then-settle
@@ -202,42 +220,26 @@ export function WebThemeProvider({ children }: { children: React.ReactNode }) {
     loadStored().then((prefs) => {
       if (!active) return;
       setThemeIdState(prefs.themeId);
-      setModePrefState(prefs.modePref);
     });
     return () => {
       active = false;
     };
   }, []);
 
-  const persist = useCallback((next: StoredPrefs) => {
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {
+  const setThemeId = useCallback((id: string) => {
+    setThemeIdState(id);
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ themeId: id })).catch(() => {
       // Private-browsing, storage-full, or no-op native backends — the
       // switcher still works for this session, it just won't be remembered.
     });
   }, []);
 
-  const setThemeId = useCallback(
-    (id: string) => {
-      setThemeIdState(id);
-      persist({ themeId: id, modePref });
-    },
-    [modePref, persist]
-  );
-  const setModePref = useCallback(
-    (m: WebModePref) => {
-      setModePrefState(m);
-      persist({ themeId, modePref: m });
-    },
-    [themeId, persist]
-  );
-
-  const mode: WebMode = modePref === 'system' ? (systemScheme === 'light' ? 'light' : 'dark') : modePref;
-
-  const palette = useMemo(() => resolvePalette(themeId, mode), [themeId, mode]);
+  const palette = useMemo(() => resolvePalette(themeId), [themeId]);
+  const mode: WebMode = themeById(themeId).mode;
 
   const value = useMemo(
-    () => ({ themeId, mode, modePref, palette, themes: WEB_THEMES, setThemeId, setModePref }),
-    [themeId, mode, modePref, palette, setThemeId, setModePref]
+    () => ({ themeId, mode, palette, themes: WEB_THEMES, setThemeId }),
+    [themeId, mode, palette, setThemeId]
   );
 
   return <WebThemeCtx.Provider value={value}>{children}</WebThemeCtx.Provider>;

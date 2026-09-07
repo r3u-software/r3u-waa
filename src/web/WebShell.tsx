@@ -17,7 +17,7 @@ import {
   WalletIcon,
 } from '../components/icons';
 import { useWebTheme, webOnlyStyle } from './webTheme';
-import { ColorThemeSwitcher, ModeSwitcher } from './webUi';
+import { ColorThemeSwitcher } from './webUi';
 import { BODY, DISPLAY, T } from './nexusType';
 
 /**
@@ -150,8 +150,12 @@ export function WebShell({
       style={[
         s.stage,
         { backgroundColor: palette.bg },
+        // Each theme's own hand-set ambient glow (`palette.ambient` in
+        // webTheme.tsx) — Sunrise's three-blob warm mesh in particular
+        // doesn't reduce to the same "two radial glows off the accent
+        // pair" formula this used before switching to three fixed themes.
         webOnlyStyle({
-          backgroundImage: `radial-gradient(1100px 560px at 6% -12%, ${hexAlpha(palette.accent, 0.22)}, transparent 60%), radial-gradient(950px 520px at 106% 8%, ${hexAlpha(palette.accent2, 0.16)}, transparent 55%), linear-gradient(165deg, ${palette.bg}, ${palette.bg2})`,
+          backgroundImage: `${palette.ambient}, linear-gradient(165deg, ${palette.bg}, ${palette.bg2})`,
         }),
       ]}
     >
@@ -266,11 +270,8 @@ export function WebShell({
                     webOnlyStyle({ boxShadow: '0 24px 60px rgba(0,0,0,0.4)' }),
                   ]}
                 >
-                  <Text style={[s.panelLabel, { color: palette.muted }]}>COLOR THEME</Text>
+                  <Text style={[s.panelLabel, { color: palette.muted }]}>THEME</Text>
                   <ColorThemeSwitcher />
-                  <View style={[s.panelDivider, { backgroundColor: palette.border }]} />
-                  <Text style={[s.panelLabel, { color: palette.muted }]}>DISPLAY</Text>
-                  <ModeSwitcher />
                 </View>
               ) : null}
             </View>
@@ -385,18 +386,21 @@ const s = StyleSheet.create({
   contentInner: { padding: 24, width: '100%', maxWidth: 1180, alignSelf: 'center' },
 
   iconBtn: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  // Widened from the old 260px swatch-only popover to fit three named
+  // theme cards (swatch + name + tagline) side by side — the panel now
+  // shows the same picker that was actually proposed and approved, not a
+  // cut-down "quick" version of it.
   themePanel: {
     position: 'absolute',
     top: 46,
     right: 0,
-    width: 260,
+    width: 420,
     borderWidth: 1,
     borderRadius: 16,
     padding: 14,
     zIndex: 90,
   } as ViewStyle,
   panelLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 9 },
-  panelDivider: { height: 1, marginVertical: 13 },
 
   // `.uchip` / `.avatar` / `.un` / `.ur`.
   userChip: { flexDirection: 'row', alignItems: 'center', gap: 9, borderWidth: 1, borderRadius: 999, paddingVertical: 4, paddingHorizontal: 5, paddingRight: 13 },
