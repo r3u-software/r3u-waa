@@ -872,7 +872,21 @@ export function ColorThemeSwitcher({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+    // Fixed 3-column row, `flexWrap` deliberately NOT set — real-device bug
+    // found 2026-09-08: `flex: 1` inside a wrapping row meant that on any
+    // container narrower than ~356px (basically every real phone screen,
+    // and any desktop browser window that isn't fairly wide), the 3rd card
+    // wrapped onto its own line and then stretched to fill the whole row
+    // alone, since a lone wrapped `flex: 1` item claims 100% of it — Frost
+    // rendered full-width and differently from Aurora/Sunrise on native,
+    // and the same wrap-then-stretch on web left a mis-sized card
+    // overlapping other chrome, blocking real clicks on Sunrise/Frost
+    // (the click-outside-to-close handler was fine — this was a layout
+    // bug, not a repeat of the earlier stacking-context one). `flexBasis: 0`
+    // + `flexGrow: 1` with no wrap guarantees exactly 3 equal columns on
+    // any width — they shrink together on a narrow screen instead of one
+    // reflowing alone, so all 3 always look and behave identically.
+    <View style={{ flexDirection: 'row', gap: 10 }}>
       {WEB_THEMES.map((t) => {
         const on = t.id === themeId;
         return (
@@ -883,38 +897,50 @@ export function ColorThemeSwitcher({ compact = false }: { compact?: boolean }) {
             accessibilityLabel={t.label}
             accessibilityState={{ selected: on }}
             style={{
-              flex: 1,
-              // 3 cards, one row: this needs to actually fit alongside the
-              // popover's own width (`s.themePanel` in WebShell.tsx, 420px)
-              // rather than being guessed independently of it — 130 here
-              // against a 380px panel wrapped Frost onto its own row,
-              // found live rather than assumed.
-              minWidth: 112,
+              flexBasis: 0,
+              flexGrow: 1,
+              flexShrink: 1,
               borderRadius: 14,
               padding: 11,
               borderWidth: 2,
               borderColor: on ? t.accent : 'transparent',
               backgroundColor: on ? hexAlphaLocal(t.accent, 0.08) : palette.hover,
+              ...(on
+                ? {
+                    shadowColor: t.accent,
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 8,
+                    elevation: 3,
+                  }
+                : null),
             }}
           >
             <View style={{ height: 44, borderRadius: 9, overflow: 'hidden', marginBottom: 9 }}>
               <ExpoLinearGradient colors={[t.accent, t.accent2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1 }} />
             </View>
             {on ? (
+              // Circular selection badge — bumped 18->20px with a white
+              // ring so it reads clearly against any of the 3 swatches,
+              // plus the card-level shadow above, per direct feedback that
+              // the old plain accent-fill dot didn't read as "selected"
+              // clearly enough.
               <View
                 style={{
                   position: 'absolute',
-                  top: 8,
-                  right: 8,
-                  width: 18,
-                  height: 18,
+                  top: 7,
+                  right: 7,
+                  width: 20,
+                  height: 20,
                   borderRadius: 999,
                   backgroundColor: t.accent,
+                  borderWidth: 2,
+                  borderColor: '#fff',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <CheckIcon color="#fff" size={10} />
+                <CheckIcon color="#fff" size={9} />
               </View>
             ) : null}
             <Text style={{ fontSize: 12.5, fontWeight: '700', color: palette.text }}>{t.label}</Text>
